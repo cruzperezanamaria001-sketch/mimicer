@@ -11,8 +11,8 @@ public class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUNDS =
             DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MimicerMod.MOD_ID);
 
-    /** Grito del Mímico: se elige al azar uno de los archivos listados en sounds.json. */
-    public static final RegistryObject<SoundEvent> MIMIC_SCREAM = register("mimico_grito");
+    /** Grito del aldeano deformado (Mímico): se elige al azar uno de los archivos listados en sounds.json. */
+    public static final RegistryObject<SoundEvent> MIMIC_SCREAM = register("aldeano_grito");
 
     private static RegistryObject<SoundEvent> register(String name) {
         return SOUNDS.register(name,

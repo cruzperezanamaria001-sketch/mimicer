@@ -6,11 +6,43 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Paso de una sola vez: si existe sound-sources.txt (líneas "nombre url"), descarga los MP3 generados con
+      # ElevenLabs, los convierte a OGG mono (Minecraft Java no admite MP3), los guarda en assets/.../sounds/
+      # y los sube al repositorio junto con la retirada de sound-sources.txt (las URL firmadas caducan).
+      - name: Convertir sonidos MP3 a OGG
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          if [ -f sound-sources.txt ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+            OUT=src/main/resources/assets/mimicer/sounds
+            mkdir -p "$OUT" tmp-audio
+            while read -r name url; do
+              [ -z "${name:-}" ] && continue
+              curl -fsSL --max-time 60 -o "tmp-audio/$name.mp3" "$url"
+              dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "tmp-audio/$name.mp3")
+              echo "$name: ${dur}s"
+              awk -v d="$dur" 'BEGIN { exit !(d > 0.2 && d < 10) }'
+              ffmpeg -y -loglevel error -i "tmp-audio/$name.mp3" -ac 1 -ar 44100 -c:a libvorbis -q:a 4 "$OUT/$name.ogg"
+            done < sound-sources.txt
+            rm -rf tmp-audio
+            git rm -q sound-sources.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$OUT"
+            git commit -q -m "Sonidos: convertir MP3 de ElevenLabs a OGG mono"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4

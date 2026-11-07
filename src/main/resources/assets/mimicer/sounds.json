@@ -1,10 +1,10 @@
 {
-  "mimico_grito": {
-    "subtitle": "subtitles.mimicer.mimico_grito",
+  "aldeano_grito": {
+    "subtitle": "subtitles.mimicer.aldeano_grito",
     "sounds": [
-      { "name": "mimicer:mimico_grito_1", "volume": 1.0, "attenuation_distance": 48 },
-      { "name": "mimicer:mimico_grito_2", "volume": 1.0, "attenuation_distance": 48 },
-      { "name": "mimicer:mimico_grito_3", "volume": 1.0, "attenuation_distance": 48 }
+      { "name": "mimicer:aldeano_grito", "volume": 1.0, "attenuation_distance": 48 },
+      { "name": "mimicer:aldeano_grito_2", "volume": 1.0, "attenuation_distance": 48 },
+      { "name": "mimicer:aldeano_grito_3", "volume": 1.0, "attenuation_distance": 48 }
     ]
   }
 }
