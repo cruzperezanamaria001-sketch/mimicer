@@ -42,3 +42,17 @@ animaciones y los modelos puede necesitar ajustes. Pendiente / limitaciones cono
 Alto y negro, como un Enderman, con ojos rojos. Se teletransporta a árboles y paredes de casas cerca de ti y se asoma tras el tronco o la pared. Si te acercas dice **"No te acerques"** (texto rojo + voz). Si te acercas más (o te quedas mirándolo) te persigue, te agarra, te levanta y te estampa contra el suelo (muerte instantánea, con sangre y posible pérdida de extremidades). Solo ataca a jugadores y aldeanos; los monstruos no le hacen nada. Huevo de aparición en la pestaña "The Mimic".
 
 Limitaciones (sin probar en el juego): los golems de hierro sí pueden atacarlo; al medir 2,9 no cabe por puertas normales, así que si no encuentra camino se teletransporta junto a su presa.
+
+## The Glitch (tercera entidad, requiere GeckoLib 4.8.4)
+
+**Requisito:** instala GeckoLib 4.8.4 para Forge 1.20.1 junto al mod.
+
+- **Observa:** aparece en aldeas (de forma natural solo cerca de aldeanos), tras ventanas o junto a paredes de casas, inmóvil y mirándote. Cambia de sitio cada 15-40 s sin ponerse casi nunca justo delante de ti.
+- **Jumpscare:** si lo miras directamente se abalanza delante de ti, con distorsión de pantalla, náusea breve y sonido; luego se aparta. Enfriamiento configurable (por jugador y propio).
+- **Corrupción:** si algo lo persigue (jugador, aldeano, animal o monstruo que lo ataque o se le acerque rápido) huye caminando y convierte el suelo en **Bloques Glitch** (textura animada, partículas), poco a poco. Límites en `mimicer-common.toml`: bloques máximos por entidad, radio, bloques por segundo; no toca bloques con inventario, irrompibles ni demasiado duros.
+- **Rotura:** si se atasca rompe obstáculos blandos (dureza máxima y tiempo configurables), con grietas, partículas y sonido.
+- **Rayo morado:** se detiene, carga energía y dispara un rayo que viaja hacia el objetivo, se detiene contra bloques y golpea una sola vez a cada entidad (2-3 corazones, configurable).
+- **Sonidos:** sintetizados (aparición, jumpscare, corrupción, carga, rayo, pasos).
+- Animaciones GeckoLib: aparición, idle, observación, giro de cabeza, jumpscare, caminata, persecución, corrupción, rotura, carga, disparo y muerte.
+
+Limitaciones: compila en Actions, pero no se ha probado en el juego; el modelo y las animaciones están escritos a mano y pueden necesitar ajustes.
