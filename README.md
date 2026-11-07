@@ -36,3 +36,9 @@ animaciones y los modelos puede necesitar ajustes. Pendiente / limitaciones cono
 - En los cuerpos de animales no se ocultan las patas perdidas (solo en jugadores y aldeanos).
 - Los aldeanos usan su cerebro de vainilla; su huida y refugio se corrigen sobrescribiendo su objetivo de movimiento.
 - La cámara bajo la cama se simula reduciendo la hitbox y el campo de visión del jugador dentro de la cama.
+
+## The Void (nuevo monstruo)
+
+Alto y negro, como un Enderman, con ojos rojos. Se teletransporta a árboles y paredes de casas cerca de ti y se asoma tras el tronco o la pared. Si te acercas dice **"No te acerques"** (texto rojo + voz). Si te acercas más (o te quedas mirándolo) te persigue, te agarra, te levanta y te estampa contra el suelo (muerte instantánea, con sangre y posible pérdida de extremidades). Solo ataca a jugadores y aldeanos; los monstruos no le hacen nada. Huevo de aparición en la pestaña "The Mimic".
+
+Limitaciones (sin probar en el juego): los golems de hierro sí pueden atacarlo; al medir 2,9 no cabe por puertas normales, así que si no encuentra camino se teletransporta junto a su presa.

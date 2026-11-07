@@ -15,6 +15,7 @@ public final class ClientSetup {
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.MIMIC.get(), MimicRenderer::new);
         event.registerEntityRenderer(ModEntities.CORPSE.get(), CorpseRenderer::new);
+        event.registerEntityRenderer(ModEntities.VOID.get(), VoidRenderer::new);
     }
 
     @SubscribeEvent

@@ -16,6 +16,16 @@ public final class ModEvents {
     @SubscribeEvent
     public static void onAttributes(EntityAttributeCreationEvent event) {
         event.put(ModEntities.MIMIC.get(), MimicEntity.createAttributes().build());
+        event.put(ModEntities.VOID.get(), com.mimicer.entity.VoidEntity.createAttributes().build());
+    }
+
+    @SubscribeEvent
+    public static void onSpawnPlacement(net.minecraftforge.event.entity.SpawnPlacementRegisterEvent event) {
+        event.register(ModEntities.VOID.get(),
+                net.minecraft.world.entity.SpawnPlacements.Type.ON_GROUND,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                net.minecraft.world.entity.monster.Monster::checkMonsterSpawnRules,
+                net.minecraftforge.event.entity.SpawnPlacementRegisterEvent.Operation.OR);
     }
 
     @SubscribeEvent

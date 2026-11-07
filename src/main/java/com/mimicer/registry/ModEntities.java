@@ -19,6 +19,12 @@ public class ModEntities {
                     .clientTrackingRange(10)
                     .build("mimico"));
 
+    public static final RegistryObject<EntityType<com.mimicer.entity.VoidEntity>> VOID = ENTITIES.register("the_void",
+            () -> EntityType.Builder.of(com.mimicer.entity.VoidEntity::new, MobCategory.MONSTER)
+                    .sized(0.6F, 2.9F)
+                    .clientTrackingRange(10)
+                    .build("the_void"));
+
     public static final RegistryObject<EntityType<CorpseEntity>> CORPSE = ENTITIES.register("cuerpo",
             () -> EntityType.Builder.of(CorpseEntity::new, MobCategory.MISC)
                     .sized(1.4F, 0.4F)

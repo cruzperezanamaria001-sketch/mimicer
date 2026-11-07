@@ -60,6 +60,24 @@ public final class GameEvents {
         }
     }
 
+    /** Los monstruos no le hacen nada a The Void. */
+    @SubscribeEvent
+    public static void onVoidTarget(LivingChangeTargetEvent event) {
+        if (event.getNewTarget() instanceof com.mimicer.entity.VoidEntity && event.getEntity() instanceof Enemy
+                && !(event.getEntity() instanceof com.mimicer.entity.VoidEntity)) {
+            event.setCanceled(true);
+        }
+    }
+
+    /** Mientras The Void agarra a alguien, no puede bajarse (ni con shift). */
+    @SubscribeEvent
+    public static void onMount(net.minecraftforge.event.entity.EntityMountEvent event) {
+        if (event.isDismounting() && event.getEntityBeingMounted() instanceof com.mimicer.entity.VoidEntity v
+                && v.isGrabbing() && event.getEntityMounting().isAlive()) {
+            event.setCanceled(true);
+        }
+    }
+
     // ------------------------------------------------------------ extremidades y sangrado
 
     @SubscribeEvent
@@ -77,7 +95,8 @@ public final class GameEvents {
         if (!(victim.level() instanceof ServerLevel level) || !LimbSystem.canLoseLimbs(victim)) {
             return;
         }
-        boolean direct = event.getSource().getEntity() instanceof MimicEntity;
+        boolean direct = event.getSource().getEntity() instanceof MimicEntity
+                || event.getSource().getEntity() instanceof com.mimicer.entity.VoidEntity;
         if (!direct && !(victim.getLastHurtByMob() instanceof MimicEntity)) {
             return;
         }

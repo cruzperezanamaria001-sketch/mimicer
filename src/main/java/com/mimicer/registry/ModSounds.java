@@ -14,6 +14,9 @@ public class ModSounds {
     /** Grito del aldeano deformado (Mímico): se elige al azar uno de los archivos listados en sounds.json. */
     public static final RegistryObject<SoundEvent> MIMIC_SCREAM = register("aldeano_grito");
 
+    /** Voz de The Void: "No te acerques". */
+    public static final RegistryObject<SoundEvent> VOID_WARNING = register("void_warning");
+
     private static RegistryObject<SoundEvent> register(String name) {
         return SOUNDS.register(name,
                 () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MimicerMod.MOD_ID, name)));

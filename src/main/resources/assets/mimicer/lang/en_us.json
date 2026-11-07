@@ -3,6 +3,9 @@
   "item.mimicer.mimico_spawn_egg": "Mimic Spawn Egg",
   "entity.mimicer.mimico": "Mimic",
   "entity.mimicer.cuerpo": "Body",
+  "entity.mimicer.the_void": "The Void",
+  "item.mimicer.the_void_spawn_egg": "The Void Spawn Egg",
+  "subtitles.mimicer.void_warning": "The Void whispers",
   "subtitles.mimicer.aldeano_grito": "Mimic screams",
   "message.mimicer.hiding": "Hiding under the bed. Press Jump to get out."
 }

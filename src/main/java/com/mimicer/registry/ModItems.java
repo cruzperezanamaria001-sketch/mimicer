@@ -25,6 +25,10 @@ public class ModItems {
             () -> new net.minecraftforge.common.ForgeSpawnEggItem(ModEntities.MIMIC,
                     0x8a6f4d, 0x5a0000, new Item.Properties()));
 
+    public static final RegistryObject<Item> VOID_SPAWN_EGG = ITEMS.register("the_void_spawn_egg",
+            () -> new net.minecraftforge.common.ForgeSpawnEggItem(ModEntities.VOID,
+                    0x050505, 0xcc0000, new Item.Properties()));
+
     public static final RegistryObject<CreativeModeTab> TAB = TABS.register("the_mimic",
             () -> CreativeModeTab.builder()
                     .title(Component.literal("The Mimic"))
@@ -32,6 +36,7 @@ public class ModItems {
                     .displayItems((params, output) -> {
                         output.accept(BOARD.get());
                         output.accept(MIMIC_SPAWN_EGG.get());
+                        output.accept(VOID_SPAWN_EGG.get());
                     })
                     .build());
 }

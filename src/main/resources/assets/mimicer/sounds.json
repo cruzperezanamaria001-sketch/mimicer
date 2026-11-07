@@ -6,5 +6,11 @@
       { "name": "mimicer:aldeano_grito_2", "volume": 1.0, "attenuation_distance": 48 },
       { "name": "mimicer:aldeano_grito_3", "volume": 1.0, "attenuation_distance": 48 }
     ]
+  },
+  "void_warning": {
+    "subtitle": "subtitles.mimicer.void_warning",
+    "sounds": [
+      { "name": "mimicer:void_no_te_acerques", "volume": 1.0, "attenuation_distance": 40 }
+    ]
   }
 }

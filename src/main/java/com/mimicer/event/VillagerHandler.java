@@ -110,6 +110,12 @@ public final class VillagerHandler {
         CompoundTag data = villager.getPersistentData();
         List<MimicEntity> mimics = level.getEntitiesOfClass(MimicEntity.class,
                 villager.getBoundingBox().inflate(40.0, 12.0, 40.0), m -> m.isAlive() && m.isStrange());
+        for (com.mimicer.entity.VoidEntity v : level.getEntitiesOfClass(com.mimicer.entity.VoidEntity.class,
+                villager.getBoundingBox().inflate(20.0, 8.0, 20.0), e -> e.isAlive() && e.isAggressive())) {
+            data.putLong(TAG_THREAT, now);
+            raiseAlarm(level, villager, now);
+            return;
+        }
         if (mimics.isEmpty()) {
             // Sin amenaza cerca y de día la alerta se acaba: no se quedan encerrados ni vuelven a atrincherarse.
             if (level.isDay()) {

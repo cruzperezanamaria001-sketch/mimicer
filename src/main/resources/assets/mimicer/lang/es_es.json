@@ -3,6 +3,9 @@
   "item.mimicer.mimico_spawn_egg": "Huevo generador de Mímico",
   "entity.mimicer.mimico": "Mímico",
   "entity.mimicer.cuerpo": "Cuerpo",
+  "entity.mimicer.the_void": "The Void",
+  "item.mimicer.the_void_spawn_egg": "Huevo generador de The Void",
+  "subtitles.mimicer.void_warning": "The Void susurra",
   "subtitles.mimicer.aldeano_grito": "El Mímico grita",
   "message.mimicer.hiding": "Escondido bajo la cama. Pulsa Saltar para salir."
 }
