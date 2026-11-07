@@ -282,13 +282,28 @@ public class MimicEntity extends Monster {
         this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
 
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this).setAlertOthers());
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false,
-                e -> isMonsterForm() && !HideManager.isHidden((Player) e)));
-        // Los aldeanos se atrincheran: el Mímico debe poder ir a por ellos aunque no los vea y romper las barricadas.
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, AbstractVillager.class, 10, false, false,
-                e -> isMonsterForm()));
-        this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, Animal.class, 20, true, false,
-                e -> isMonsterForm()));
+        // Un solo selector para jugadores, aldeanos y animales: así elige siempre a la presa MÁS CERCANA,
+        // sin dar prioridad a los jugadores sobre el resto.
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, LivingEntity.class, 5, false, false,
+                this::isPrey));
+    }
+
+    /**
+     * Presas válidas en forma monstruosa. Jugadores y animales exigen verlos (los jugadores en casa los gestiona
+     * el acecho por ventanas); los aldeanos se atrincheran, así que se les puede perseguir sin verlos
+     * y romper las barricadas.
+     */
+    private boolean isPrey(LivingEntity e) {
+        if (!isMonsterForm() || e == this) {
+            return false;
+        }
+        if (e instanceof Player player) {
+            return !HideManager.isHidden(player) && hasLineOfSight(player);
+        }
+        if (e instanceof AbstractVillager) {
+            return true;
+        }
+        return e instanceof Animal && hasLineOfSight(e);
     }
 
     // ------------------------------------------------------------------ estado
