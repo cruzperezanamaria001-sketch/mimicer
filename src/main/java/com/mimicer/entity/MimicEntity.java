@@ -444,7 +444,7 @@ public class MimicEntity extends Monster {
         this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.2D, false));
         this.goalSelector.addGoal(4, new MimicInvestigateGoal(this));
         this.goalSelector.addGoal(5, new MimicStalkWindowGoal(this));
-        this.goalSelector.addGoal(6, new OpenDoorGoal(this, true));
+        this.goalSelector.addGoal(6, new OpenDoorGoal(this, false));
         this.goalSelector.addGoal(7, new WaterAvoidingRandomStrollGoal(this, 0.8D));
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Villager.class, 6.0F));
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));

@@ -27,6 +27,9 @@ public class MimicBreakBlocksGoal extends Goal {
     private int progress;
     private int needed;
     private int cooldown;
+    private Vec3 lastPos;
+    private int lastCheckTick;
+    private boolean stuck;
 
     public MimicBreakBlocksGoal(MimicEntity mimic) {
         this.mimic = mimic;
@@ -43,9 +46,11 @@ public class MimicBreakBlocksGoal extends Goal {
             return false;
         }
         cooldown = 8;
+        updateStuck();
         double dist = mimic.distanceTo(target);
+        // "Atascado": lleva un rato sin avanzar y aún no está junto a su presa (p. ej. abriendo y cerrando una puerta).
         boolean blocked = mimic.getNavigation().isDone() || mimic.horizontalCollision
-                || !mimic.getSensing().hasLineOfSight(target);
+                || !mimic.getSensing().hasLineOfSight(target) || (stuck && dist > 2.5);
         if (!blocked || dist > 30.0 || dist < 1.0) {
             return false;
         }
@@ -102,12 +107,50 @@ public class MimicBreakBlocksGoal extends Goal {
         cooldown = 5;
     }
 
+    private void updateStuck() {
+        int now = mimic.tickCount;
+        if (lastPos == null || now - lastCheckTick >= 30) {
+            Vec3 cur = mimic.position();
+            stuck = lastPos != null && cur.distanceToSqr(lastPos) < 0.36;
+            lastPos = cur;
+            lastCheckTick = now;
+        }
+    }
+
+    /** Tabla delante del Mímico (hasta 2,5 bloques), la más cercana. Tienen prioridad sobre puertas y cristales. */
+    private BlockPos findNearbyBoard(Vec3 dir) {
+        BlockPos base = mimic.blockPosition();
+        BlockPos best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (BlockPos pos : BlockPos.betweenClosed(base.offset(-2, 0, -2), base.offset(2, 2, 2))) {
+            if (!(mimic.level().getBlockState(pos).getBlock() instanceof BoardBlock)) {
+                continue;
+            }
+            Vec3 c = Vec3.atCenterOf(pos);
+            double dx = c.x - mimic.getX();
+            double dz = c.z - mimic.getZ();
+            double dist = dx * dx + dz * dz;
+            if (dist > 6.25 || dx * dir.x + dz * dir.z < 0.0) {
+                continue;
+            }
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = pos.immutable();
+            }
+        }
+        return best;
+    }
+
     private BlockPos findObstacle(LivingEntity target) {
         Vec3 dir = new Vec3(target.getX() - mimic.getX(), 0.0, target.getZ() - mimic.getZ());
         if (dir.lengthSqr() < 1.0E-4) {
             return null;
         }
         dir = dir.normalize();
+        BlockPos board = findNearbyBoard(dir);
+        if (board != null) {
+            return board;
+        }
         for (double dist : DISTANCES) {
             for (double h : HEIGHTS) {
                 BlockPos pos = BlockPos.containing(mimic.getX() + dir.x * dist, mimic.getY() + h, mimic.getZ() + dir.z * dist);

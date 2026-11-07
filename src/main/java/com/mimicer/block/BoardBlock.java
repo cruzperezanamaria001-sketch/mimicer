@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
@@ -48,6 +49,15 @@ public class BoardBlock extends Block {
             case WEST -> WEST;
             default -> NORTH;
         };
+    }
+
+    /**
+     * Por defecto un bloque fino se considera "transitable" para la IA, y los mobs intentan atravesar la barricada
+     * en vez de romperla. Se marca como obstáculo para que el camino quede bloqueado y el Mímico la rompa.
+     */
+    @Override
+    public boolean isPathfindable(BlockState state, BlockGetter level, BlockPos pos, PathComputationType type) {
+        return false;
     }
 
     @Override
