@@ -21,5 +21,6 @@ public final class ClientSetup {
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(MimicModel.LAYER, MimicModel::createBodyLayer);
+        event.registerLayerDefinition(VoidModel.LAYER, VoidModel::createBodyLayer);
     }
 }
