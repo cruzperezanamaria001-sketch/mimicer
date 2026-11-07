@@ -669,6 +669,9 @@ public class GlitchEntity extends Monster implements GeoEntity {
                     if (beamHit.add(e.getId())) {
                         double min = GlitchConfig.BEAM_MIN_DAMAGE.get(), max = Math.max(min, GlitchConfig.BEAM_MAX_DAMAGE.get());
                         e.hurt(damageSources().indirectMagic(this, this), (float) (min + random.nextDouble() * (max - min)));
+                        if (com.mimicer.blood.BloodSystem.canBleed(e)) {
+                            com.mimicer.blood.BloodSystem.heavyHit(level, e, beamDir, 1.5);
+                        }
                         level.sendParticles(ParticleTypes.ELECTRIC_SPARK, e.getX(), e.getY() + e.getBbHeight() / 2, e.getZ(), 14, 0.3, 0.4, 0.3, 0.3);
                     }
                 }

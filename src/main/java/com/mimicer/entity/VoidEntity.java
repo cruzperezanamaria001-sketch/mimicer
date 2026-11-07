@@ -285,6 +285,7 @@ public class VoidEntity extends Monster {
         Vec3 impact = new Vec3(sx, getY() + 0.2, sz);
         sl.sendParticles(ParticleTypes.EXPLOSION, impact.x, impact.y, impact.z, 2, 0.3, 0.1, 0.3, 0.0);
         LimbSystem.spawnBlood(sl, impact, 60);
+        com.mimicer.blood.BloodSystem.impactBurst(sl, victim, new Vec3(sx, getY(), sz), 2.5);
         sl.playSound(null, sx, getY(), sz, SoundEvents.PLAYER_BIG_FALL, SoundSource.HOSTILE, 2.0F, 0.5F);
         sl.playSound(null, sx, getY(), sz, SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 1.5F, 0.6F);
 

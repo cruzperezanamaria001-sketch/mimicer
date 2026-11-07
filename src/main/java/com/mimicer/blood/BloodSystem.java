@@ -290,6 +290,9 @@ public final class BloodSystem {
     // ------------------------------------------------------------------ golpe
 
     public static void onHit(ServerLevel level, LivingEntity victim, DamageSource src, float amount) {
+        if (src.getDirectEntity() instanceof GlitchEntity) {
+            return;     // el rayo morado salpica por su cuenta (dirección del rayo), ver impactBurst
+        }
         double mult = BloodConfig.INTENSITY.get();
         double intensity = Mth.clamp(amount / 4.0, 0.25, 4.0) * mult;
         Vec3 origin = victim.position().add(0.0, victim.getBbHeight() * 0.65, 0.0);
@@ -303,6 +306,25 @@ public final class BloodSystem {
         Vec3 origin = victim.position().add(0.0, victim.getBbHeight() * 0.65, 0.0);
         hitSplash(level, victim, origin, dir.normalize(), Math.max(2.0, strength) * BloodConfig.INTENSITY.get());
         addWound(victim, 5.0F);
+    }
+
+    /**
+     * Estampido contra el suelo (p. ej. el golpe final de The Void): gran charco, salpicadura radial baja que
+     * alcanza paredes cercanas y chorro de partículas.
+     */
+    public static void impactBurst(ServerLevel level, LivingEntity victim, Vec3 pos, double strength) {
+        if (!BloodConfig.ENABLED.get()) return;
+        double s = strength * BloodConfig.INTENSITY.get();
+        pool(level, pos, 1.4 + s * 0.7, BloodConfig.MAX_STAINS_PER_EVENT.get() * 2, victim);
+        RandomSource r = level.random;
+        Vec3 low = pos.add(0.0, 0.3, 0.0);
+        int rays = Mth.clamp((int) Math.round(6 + s * 3), 6, 16);
+        for (int i = 0; i < rays; i++) {
+            double a = r.nextDouble() * Math.PI * 2;
+            splatter(level, victim, low, new Vec3(Math.cos(a), 0.15 + r.nextDouble() * 0.4, Math.sin(a)), 1, 0.15,
+                    2.5 + s * 1.2, false);
+        }
+        spray(level, low, new Vec3(0.0, 1.0, 0.0), 10, 0.3);
     }
 
     private static void hitSplash(ServerLevel level, LivingEntity victim, Vec3 origin, Vec3 dir, double intensity) {

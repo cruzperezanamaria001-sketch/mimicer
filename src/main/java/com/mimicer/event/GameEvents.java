@@ -97,7 +97,9 @@ public final class GameEvents {
         }
         boolean direct = event.getSource().getEntity() instanceof MimicEntity
                 || event.getSource().getEntity() instanceof com.mimicer.entity.VoidEntity;
-        if (!direct && !(victim.getLastHurtByMob() instanceof MimicEntity)) {
+        boolean glitch = event.getSource().getEntity() instanceof com.mimicer.entity.GlitchEntity
+                || victim.getLastHurtByMob() instanceof com.mimicer.entity.GlitchEntity;
+        if (!direct && !glitch && !(victim.getLastHurtByMob() instanceof MimicEntity)) {
             return;
         }
         int limbs = LimbSystem.get(victim);
