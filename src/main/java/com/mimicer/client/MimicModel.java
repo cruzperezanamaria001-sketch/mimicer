@@ -105,9 +105,15 @@ public class MimicModel extends EntityModel<MimicEntity> {
         head.xScale = 1.0F + 0.2F * m;
         head.yScale = 1.0F + 0.28F * m;
         head.zScale = 1.0F + 0.1F * m;
-        nose.xScale = 1.0F + 0.8F * m;
-        nose.yScale = 1.0F + 1.4F * m;
-        nose.zScale = 1.0F + 2.2F * m;
+        // La nariz crece pero sigue pegada a la cara: se compensa el desplazamiento que provoca escalar
+        // alrededor de su pivote (la caja ocupa z -6..-4 e y -1..3 respecto al pivote).
+        float noseX = 1.0F + 0.5F * m;
+        float noseY = 1.0F + 0.7F * m;
+        float noseZ = 1.0F + 0.8F * m;
+        nose.xScale = noseX;
+        nose.yScale = noseY;
+        nose.zScale = noseZ;
+        nose.setPos(0.0F, noseY - 3.0F, 4.0F * (noseZ - 1.0F));
 
         body.xScale = 1.0F;
         body.yScale = 1.0F + 0.15F * m;

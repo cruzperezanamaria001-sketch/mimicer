@@ -41,6 +41,13 @@ public final class VillagerHandler {
     private static final String TAG_ORIGIN = "mimicer_origin";
     private static final String TAG_PANIC = "mimicer_panic_ticks";
     private static final String TAG_BOARDS = "mimicer_boards";
+    private static final String TAG_THREAT = "mimicer_threat_time";
+    private static final String TAG_UNBOARD = "mimicer_unboard_time";
+
+    /** Ticks sin ver amenazas antes de abrir las barricadas. */
+    private static final int CALM_TICKS = 200;
+    /** Una amenaza solo justifica tapiar si se vio hace menos de esto. */
+    private static final int THREAT_RECENT_TICKS = 600;
 
     private static final int ALARM_TICKS = 1200;
     private static final int MAX_PANIC_TICKS = 300;
@@ -73,8 +80,12 @@ public final class VillagerHandler {
 
         if (alarmed) {
             seekShelter(level, villager, brain, data, origin);
-        } else if (level.isDay() && (villager.tickCount + villager.getId()) % 100 == 0) {
-            removeBoards(level, villager);
+        } else if ((villager.tickCount + villager.getId()) % 20 == 0
+                && now - data.getLong(TAG_THREAT) > CALM_TICKS) {
+            // Pasó el peligro: abren ellos mismos las barricadas para poder salir (también de día).
+            if (removeBoards(level, villager)) {
+                data.putLong(TAG_UNBOARD, now);
+            }
             data.putInt(TAG_BOARDS, 0);
         }
     }
@@ -85,10 +96,19 @@ public final class VillagerHandler {
         if ((villager.tickCount + villager.getId()) % 20 != 0) {
             return;
         }
+        CompoundTag data = villager.getPersistentData();
         List<MimicEntity> mimics = level.getEntitiesOfClass(MimicEntity.class,
-                villager.getBoundingBox().inflate(16.0, 6.0, 16.0), m -> m.isAlive() && m.isStrange());
+                villager.getBoundingBox().inflate(40.0, 12.0, 40.0), m -> m.isAlive() && m.isStrange());
+        if (mimics.isEmpty()) {
+            // Sin amenaza cerca y de día la alerta se acaba: no se quedan encerrados ni vuelven a atrincherarse.
+            if (level.isDay()) {
+                data.putLong(TAG_ALARM, 0L);
+            }
+            return;
+        }
+        data.putLong(TAG_THREAT, now);
         for (MimicEntity mimic : mimics) {
-            if (villager.hasLineOfSight(mimic)) {
+            if (villager.distanceToSqr(mimic) < 16.0 * 16.0 && villager.hasLineOfSight(mimic)) {
                 raiseAlarm(level, villager, now);
                 return;
             }
@@ -151,7 +171,11 @@ public final class VillagerHandler {
         villager.getNavigation().stop();
         brain.setMemory(MemoryModuleType.LOOK_TARGET, new BlockPosTracker(shelter.above()));
         closeDoors(level, villager);
-        if (data.getInt(TAG_BOARDS) < MAX_BOARDS && villager.getRandom().nextFloat() < 0.6F) {
+        long now = level.getGameTime();
+        boolean recentThreat = now - data.getLong(TAG_THREAT) < THREAT_RECENT_TICKS;
+        boolean justUnboarded = now - data.getLong(TAG_UNBOARD) < CALM_TICKS * 2L;
+        if (recentThreat && !justUnboarded && data.getInt(TAG_BOARDS) < MAX_BOARDS
+                && villager.getRandom().nextFloat() < 0.6F) {
             if (placeBoard(level, villager)) {
                 data.putInt(TAG_BOARDS, data.getInt(TAG_BOARDS) + 1);
             }
@@ -224,12 +248,15 @@ public final class VillagerHandler {
         return false;
     }
 
-    private static void removeBoards(ServerLevel level, Villager villager) {
+    private static boolean removeBoards(ServerLevel level, Villager villager) {
+        boolean removed = false;
         BlockPos from = villager.blockPosition();
-        for (BlockPos pos : BlockPos.betweenClosed(from.offset(-4, -1, -4), from.offset(4, 3, 4))) {
+        for (BlockPos pos : BlockPos.betweenClosed(from.offset(-6, -1, -6), from.offset(6, 3, 6))) {
             if (level.getBlockState(pos).getBlock() instanceof BoardBlock) {
                 level.destroyBlock(pos.immutable(), true);
+                removed = true;
             }
         }
+        return removed;
     }
 }

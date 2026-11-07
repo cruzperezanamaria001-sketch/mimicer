@@ -7,6 +7,7 @@ import com.mimicer.entity.goal.MimicStalkWindowGoal;
 import com.mimicer.hide.HideManager;
 import com.mimicer.limb.LimbSystem;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -39,6 +40,7 @@ import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -65,6 +67,15 @@ public class MimicEntity extends Monster {
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_THROW =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
+    /** Tipo de aldeano (bioma) y profesión que imita; vacío hasta que se asigna en el servidor. */
+    private static final EntityDataAccessor<String> DATA_VTYPE =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> DATA_PROFESSION =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.STRING);
+
+    private static final String[] PROFESSIONS = {"none", "nitwit", "armorer", "butcher", "cartographer", "cleric",
+            "farmer", "fisherman", "fletcher", "leatherworker", "librarian", "mason", "shepherd", "toolsmith",
+            "weaponsmith"};
 
     private float transformProgress;
     private float transformProgressO;
@@ -104,6 +115,36 @@ public class MimicEntity extends Monster {
         this.entityData.define(DATA_CARRYING, false);
         this.entityData.define(DATA_LIFT, 0);
         this.entityData.define(DATA_THROW, 0);
+        this.entityData.define(DATA_VTYPE, "");
+        this.entityData.define(DATA_PROFESSION, "");
+    }
+
+    /** Nombre del tipo de aldeano que imita (plains, desert, ...). */
+    public String getVillagerTypeName() {
+        String s = this.entityData.get(DATA_VTYPE);
+        return s.isEmpty() ? "plains" : s;
+    }
+
+    /** Profesión que imita ("none" si no lleva ropa de profesión). */
+    public String getProfessionName() {
+        String s = this.entityData.get(DATA_PROFESSION);
+        return s.isEmpty() ? "none" : s;
+    }
+
+    private void assignDisguise() {
+        if (this.entityData.get(DATA_VTYPE).isEmpty()) {
+            String type = "plains";
+            try {
+                type = BuiltInRegistries.VILLAGER_TYPE
+                        .getKey(VillagerType.byBiome(level().getBiome(blockPosition()))).getPath();
+            } catch (RuntimeException ignored) {
+                // se queda con plains
+            }
+            this.entityData.set(DATA_VTYPE, type);
+        }
+        if (this.entityData.get(DATA_PROFESSION).isEmpty()) {
+            this.entityData.set(DATA_PROFESSION, PROFESSIONS[random.nextInt(PROFESSIONS.length)]);
+        }
     }
 
     @Override
@@ -123,7 +164,8 @@ public class MimicEntity extends Monster {
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this).setAlertOthers());
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false,
                 e -> isMonsterForm() && !HideManager.isHidden((Player) e)));
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, AbstractVillager.class, 10, true, false,
+        // Los aldeanos se atrincheran: el Mímico debe poder ir a por ellos aunque no los vea y romper las barricadas.
+        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, AbstractVillager.class, 10, false, false,
                 e -> isMonsterForm()));
         this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, Animal.class, 20, true, false,
                 e -> isMonsterForm()));
@@ -208,6 +250,7 @@ public class MimicEntity extends Monster {
         if (origin == null) {
             origin = blockPosition();
         }
+        assignDisguise();
         if (revealTicks > 0) {
             revealTicks--;
         }
@@ -341,6 +384,15 @@ public class MimicEntity extends Monster {
         return result;
     }
 
+    /** Disfrazado de aldeano no elige objetivos, salvo que lo hayan descubierto golpeándolo. */
+    @Override
+    public void setTarget(@Nullable LivingEntity target) {
+        if (target != null && !isMonsterForm() && !isTransforming() && revealTicks <= 0) {
+            return;
+        }
+        super.setTarget(target);
+    }
+
     @Override
     public boolean canAttackType(EntityType<?> type) {
         return type != this.getType() && super.canAttackType(type);
@@ -397,6 +449,8 @@ public class MimicEntity extends Monster {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putInt("Transform", getTransformTicks());
+        tag.putString("VillagerType", this.entityData.get(DATA_VTYPE));
+        tag.putString("Profession", this.entityData.get(DATA_PROFESSION));
         if (origin != null) {
             tag.put("Origin", NbtUtils.writeBlockPos(origin));
         }
@@ -406,6 +460,8 @@ public class MimicEntity extends Monster {
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         setTransformTicks(tag.getInt("Transform"));
+        this.entityData.set(DATA_VTYPE, tag.getString("VillagerType"));
+        this.entityData.set(DATA_PROFESSION, tag.getString("Profession"));
         if (tag.contains("Origin")) {
             origin = NbtUtils.readBlockPos(tag.getCompound("Origin"));
             if (!isMonsterForm()) {

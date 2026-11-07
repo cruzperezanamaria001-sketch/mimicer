@@ -23,6 +23,6 @@ public class ModEntities {
             () -> EntityType.Builder.of(CorpseEntity::new, MobCategory.MISC)
                     .sized(1.4F, 0.4F)
                     .clientTrackingRange(8)
-                    .updateInterval(20)
+                    .updateInterval(2)
                     .build("cuerpo"));
 }

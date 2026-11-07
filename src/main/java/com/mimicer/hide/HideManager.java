@@ -84,13 +84,18 @@ public final class HideManager {
         if (data == null) {
             return;
         }
-        if (!player.isAlive() || player.level().isDay()
-                || !(player.level().getBlockState(data.bed).getBlock() instanceof BedBlock)) {
+        if (!player.isAlive() || !(player.level().getBlockState(data.bed).getBlock() instanceof BedBlock)) {
             stopHiding(player);
             return;
         }
         player.setDeltaMovement(Vec3.ZERO);
-        player.teleportTo(data.bed.getX() + 0.5, data.bed.getY() + 0.02, data.bed.getZ() + 0.5);
+        double bx = data.bed.getX() + 0.5;
+        double by = data.bed.getY() + 0.02;
+        double bz = data.bed.getZ() + 0.5;
+        // Solo recoloca si algo lo movió: teleportar cada tick provoca tirones en el cliente.
+        if (player.distanceToSqr(bx, by, bz) > 0.09) {
+            player.teleportTo(bx, by, bz);
+        }
         data.suspicion = Math.max(0.0F, data.suspicion - 0.05F);
         // Respirar y moverse bajo la cama hace un ruido pequeño de vez en cuando.
         if (player.tickCount % 80 == 0 && player.getRandom().nextFloat() < 0.3F) {

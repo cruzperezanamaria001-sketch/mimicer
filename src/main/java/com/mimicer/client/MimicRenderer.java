@@ -14,6 +14,9 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class MimicRenderer extends MobRenderer<MimicEntity, MimicModel> {
     /** De día usa la textura exacta del aldeano de vainilla. */
     private static final ResourceLocation DAY = new ResourceLocation("textures/entity/villager/villager.png");
@@ -22,7 +25,45 @@ public class MimicRenderer extends MobRenderer<MimicEntity, MimicModel> {
 
     public MimicRenderer(EntityRendererProvider.Context context) {
         super(context, new MimicModel(context.bakeLayer(MimicModel.LAYER)), 0.5F);
+        this.addLayer(new ClothesLayer(this));
         this.addLayer(new EyesLayer(this));
+    }
+
+    private static final Map<String, ResourceLocation> CLOTHES_CACHE = new HashMap<>();
+
+    private static ResourceLocation villagerTexture(String folder, String name) {
+        return CLOTHES_CACHE.computeIfAbsent(folder + "/" + name,
+                key -> new ResourceLocation("textures/entity/villager/" + key + ".png"));
+    }
+
+    /**
+     * Ropa de aldeano de vainilla: la del bioma, la de la profesión y la insignia de nivel. Sin ella
+     * el Mímico se vería con el cuerpo "desnudo" de la textura base. Solo mientras tiene aspecto de aldeano.
+     */
+    private static class ClothesLayer extends RenderLayer<MimicEntity, MimicModel> {
+        ClothesLayer(RenderLayerParent<MimicEntity, MimicModel> parent) {
+            super(parent);
+        }
+
+        @Override
+        public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, MimicEntity mimic,
+                           float limbSwing, float limbSwingAmount, float partialTick, float ageInTicks,
+                           float netHeadYaw, float headPitch) {
+            if (mimic.isInvisible() || mimic.getTransformTicks() >= MimicEntity.TRANSFORM_TICKS / 2) {
+                return;
+            }
+            renderColoredCutoutModel(getParentModel(), villagerTexture("type", mimic.getVillagerTypeName()),
+                    poseStack, buffer, packedLight, mimic, 1.0F, 1.0F, 1.0F);
+            String profession = mimic.getProfessionName();
+            if (!"none".equals(profession)) {
+                renderColoredCutoutModel(getParentModel(), villagerTexture("profession", profession),
+                        poseStack, buffer, packedLight, mimic, 1.0F, 1.0F, 1.0F);
+                if (!"nitwit".equals(profession)) {
+                    renderColoredCutoutModel(getParentModel(), villagerTexture("profession_level", "stone"),
+                            poseStack, buffer, packedLight, mimic, 1.0F, 1.0F, 1.0F);
+                }
+            }
+        }
     }
 
     @Override
