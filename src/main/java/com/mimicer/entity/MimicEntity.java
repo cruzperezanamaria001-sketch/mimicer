@@ -213,6 +213,7 @@ public class MimicEntity extends Monster {
         this.hasImpulse = true;
         dashCooldown = 140;
         playSound(SoundEvents.ZOMBIE_VILLAGER_AMBIENT, 1.4F, 0.3F);
+        playSound(com.mimicer.registry.ModSounds.MIMIC_SCREAM.get(), 1.5F, 1.25F);
     }
 
     /** Aura de frío: ralentiza y congela poco a poco a jugadores y aldeanos cercanos. */
@@ -635,6 +636,8 @@ public class MimicEntity extends Monster {
         if (monster) {
             clearRestriction();
             playSound(SoundEvents.ZOMBIE_VILLAGER_CONVERTED, 1.2F, 0.5F);
+            // Grito al transformarse; el tono cambia un poco según la apariencia.
+            playSound(com.mimicer.registry.ModSounds.MIMIC_SCREAM.get(), 2.0F, 0.85F + 0.06F * getVariant());
         } else {
             setTarget(null);
             setLurking(false);

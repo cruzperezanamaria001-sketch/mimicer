@@ -130,6 +130,8 @@ public final class HideManager {
         mimic.setTarget(player);
         player.level().playSound(null, player.blockPosition(), SoundEvents.ZOMBIE_VILLAGER_AMBIENT,
                 SoundSource.HOSTILE, 1.5F, 0.3F);
+        player.level().playSound(null, player.blockPosition(), com.mimicer.registry.ModSounds.MIMIC_SCREAM.get(),
+                SoundSource.HOSTILE, 1.5F, 1.1F);
     }
 
     public static void forget(UUID id) {

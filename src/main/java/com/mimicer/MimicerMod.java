@@ -17,6 +17,7 @@ public class MimicerMod {
         ModBlocks.BLOCKS.register(bus);
         ModItems.ITEMS.register(bus);
         ModEntities.ENTITIES.register(bus);
+        com.mimicer.registry.ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
         MinecraftForge.EVENT_BUS.register(this);
     }
