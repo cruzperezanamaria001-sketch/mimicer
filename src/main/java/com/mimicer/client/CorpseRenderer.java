@@ -81,7 +81,7 @@ public class CorpseRenderer extends EntityRenderer<CorpseEntity> {
         if (corpse.getPlayerUuid().isPresent()) {
             renderPlayer(corpse, limbs, poseStack, buffer, light);
         } else if ("minecraft:villager".equals(corpse.getVictimType())) {
-            renderVillager(limbs, poseStack, buffer, light);
+            renderVillager(corpse.getClothes(), limbs, poseStack, buffer, light);
         } else {
             renderGeneric(corpse, partialTick, poseStack, buffer, light);
         }
@@ -140,9 +140,19 @@ public class CorpseRenderer extends EntityRenderer<CorpseEntity> {
         drawModel(model, skin, poseStack, buffer, light);
     }
 
-    private void renderVillager(int limbs, PoseStack poseStack, MultiBufferSource buffer, int light) {
+    private static final String[] LEVEL_BADGES = {"stone", "stone", "iron", "gold", "emerald", "diamond"};
+
+    private static ResourceLocation villagerTexture(String folder, String name) {
+        return new ResourceLocation("textures/entity/villager/" + folder + "/" + name + ".png");
+    }
+
+    private void renderVillager(String clothes, int limbs, PoseStack poseStack, MultiBufferSource buffer, int light) {
         ModelPart root = villagerModel.root();
         ModelPart head = root.getChild("head");
+        // El sombrero depende de metadatos del tipo de aldeano; el cuerpo se dibuja sin él.
+        if (head.hasChild("hat")) {
+            head.getChild("hat").visible = false;
+        }
         ModelPart arms = root.getChild("arms");
         ModelPart rightLeg = root.getChild("right_leg");
         ModelPart leftLeg = root.getChild("left_leg");
@@ -156,6 +166,25 @@ public class CorpseRenderer extends EntityRenderer<CorpseEntity> {
         rightLeg.zRot = 0.06F;
         leftLeg.zRot = -0.06F;
         drawModel(villagerModel, VILLAGER_TEXTURE, poseStack, buffer, light);
+
+        // Ropa de vainilla: bioma, profesión e insignia de nivel, como en el aldeano vivo.
+        String[] parts = clothes.split("\\|");
+        String type = parts.length > 0 && !parts[0].isEmpty() ? parts[0] : "plains";
+        drawModel(villagerModel, villagerTexture("type", type), poseStack, buffer, light);
+        if (parts.length > 1 && !"none".equals(parts[1])) {
+            drawModel(villagerModel, villagerTexture("profession", parts[1]), poseStack, buffer, light);
+            if (!"nitwit".equals(parts[1])) {
+                int level = 1;
+                if (parts.length > 2) {
+                    try {
+                        level = Math.max(1, Math.min(5, Integer.parseInt(parts[2])));
+                    } catch (NumberFormatException ignored) {
+                        // se queda en nivel 1
+                    }
+                }
+                drawModel(villagerModel, villagerTexture("profession_level", LEVEL_BADGES[level]), poseStack, buffer, light);
+            }
+        }
     }
 
     private void drawModel(net.minecraft.client.model.EntityModel<?> model, ResourceLocation texture,

@@ -75,7 +75,7 @@ public class MimicRenderer extends MobRenderer<MimicEntity, MimicModel> {
     @Override
     protected void scale(MimicEntity mimic, PoseStack poseStack, float partialTick) {
         float m = mimic.getTransformProgress(partialTick);
-        float s = 0.9375F * Mth.lerp(m, 1.0F, 1.15F);
+        float s = 0.9375F * Mth.lerp(m, 1.0F, 1.04F);
         poseStack.scale(s, s, s);
     }
 

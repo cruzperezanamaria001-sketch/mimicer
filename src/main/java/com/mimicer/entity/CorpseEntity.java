@@ -15,6 +15,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkHooks;
@@ -40,6 +42,9 @@ public class CorpseEntity extends Entity {
             SynchedEntityData.defineId(CorpseEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> CARRIED =
             SynchedEntityData.defineId(CorpseEntity.class, EntityDataSerializers.BOOLEAN);
+    /** Ropa de un aldeano: "tipo|profesión|nivel" (p. ej. "plains|farmer|2"); vacío si no aplica. */
+    private static final EntityDataAccessor<String> CLOTHES =
+            SynchedEntityData.defineId(CorpseEntity.class, EntityDataSerializers.STRING);
 
     private UUID carrierId;
     private boolean thrown;
@@ -59,7 +64,19 @@ public class CorpseEntity extends Entity {
         corpse.entityData.set(PLAYER_UUID, Optional.ofNullable(playerUuid));
         corpse.entityData.set(LIMBS, limbs);
         corpse.entityData.set(BABY, victim.isBaby());
+        if (victim instanceof Villager villager) {
+            VillagerData data = villager.getVillagerData();
+            String type = BuiltInRegistries.VILLAGER_TYPE.getKey(data.getType()).getPath();
+            String profession = BuiltInRegistries.VILLAGER_PROFESSION.getKey(data.getProfession()).getPath();
+            corpse.entityData.set(CLOTHES, type + "|" + profession + "|" + data.getLevel());
+        } else if (victim instanceof MimicEntity mimic) {
+            corpse.entityData.set(CLOTHES, mimic.getVillagerTypeName() + "|" + mimic.getProfessionName() + "|1");
+        }
         return corpse;
+    }
+
+    public String getClothes() {
+        return this.entityData.get(CLOTHES);
     }
 
     @Override
@@ -69,6 +86,7 @@ public class CorpseEntity extends Entity {
         this.entityData.define(LIMBS, 0);
         this.entityData.define(BABY, false);
         this.entityData.define(CARRIED, false);
+        this.entityData.define(CLOTHES, "");
     }
 
     public String getVictimType() {
@@ -196,6 +214,7 @@ public class CorpseEntity extends Entity {
         entityData.set(VICTIM_TYPE, tag.getString("VictimType"));
         entityData.set(LIMBS, tag.getInt("Limbs"));
         entityData.set(BABY, tag.getBoolean("Baby"));
+        entityData.set(CLOTHES, tag.getString("Clothes"));
         entityData.set(PLAYER_UUID, tag.hasUUID("PlayerUuid") ? Optional.of(tag.getUUID("PlayerUuid")) : Optional.empty());
         age = tag.getInt("Age");
     }
@@ -205,6 +224,7 @@ public class CorpseEntity extends Entity {
         tag.putString("VictimType", getVictimType());
         tag.putInt("Limbs", getLimbs());
         tag.putBoolean("Baby", isBabyVictim());
+        tag.putString("Clothes", getClothes());
         getPlayerUuid().ifPresent(id -> tag.putUUID("PlayerUuid", id));
         tag.putInt("Age", age);
     }

@@ -55,7 +55,9 @@ public class MimicEntity extends Monster {
     public static final int TRANSFORM_TICKS = 40;
 
     private static final UUID NIGHT_SPEED_ID = UUID.fromString("5f6a0f4e-3a52-4c55-8d2c-6d1a1b0a7e11");
-    private static final EntityDimensions MONSTER_DIMENSIONS = EntityDimensions.scalable(0.7F, 2.3F);
+    // Cabe por puertas de 2 bloques; para ventanas de 1 bloque se arrastra (CRAWL).
+    private static final EntityDimensions MONSTER_DIMENSIONS = EntityDimensions.scalable(0.6F, 1.9F);
+    private static final EntityDimensions CRAWL_DIMENSIONS = EntityDimensions.scalable(0.6F, 0.9F);
 
     private static final EntityDataAccessor<Integer> DATA_TRANSFORM =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
@@ -67,6 +69,8 @@ public class MimicEntity extends Monster {
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_THROW =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> DATA_CRAWL =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.BOOLEAN);
     /** Tipo de aldeano (bioma) y profesión que imita; vacío hasta que se asigna en el servidor. */
     private static final EntityDataAccessor<String> DATA_VTYPE =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.STRING);
@@ -79,6 +83,9 @@ public class MimicEntity extends Monster {
 
     private float transformProgress;
     private float transformProgressO;
+    private float crawlProgress;
+    private float crawlProgressO;
+    private int crawlTicks;
     private boolean speedApplied;
     private boolean lastMonster;
     private int revealTicks;
@@ -117,6 +124,76 @@ public class MimicEntity extends Monster {
         this.entityData.define(DATA_THROW, 0);
         this.entityData.define(DATA_VTYPE, "");
         this.entityData.define(DATA_PROFESSION, "");
+        this.entityData.define(DATA_CRAWL, false);
+    }
+
+    // ------------------------------------------------------------------ arrastrarse
+
+    public boolean isCrawling() {
+        return this.entityData.get(DATA_CRAWL);
+    }
+
+    public float getCrawlProgress(float partialTick) {
+        return Mth.lerp(partialTick, crawlProgressO, crawlProgress);
+    }
+
+    private void setCrawling(boolean crawling) {
+        if (isCrawling() != crawling) {
+            this.entityData.set(DATA_CRAWL, crawling);
+            crawlTicks = 0;
+            refreshDimensions();
+        }
+    }
+
+    private boolean canStandUp() {
+        return level().noCollision(this, MONSTER_DIMENSIONS.makeBoundingBox(getX(), getY(), getZ()));
+    }
+
+    /** Agachado cabe donde de pie no: hay un hueco bajo (p. ej. una ventana rota) hacia el objetivo. */
+    private boolean lowGapAhead(LivingEntity target) {
+        double dx = target.getX() - getX();
+        double dz = target.getZ() - getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1.0E-3) {
+            return false;
+        }
+        dx /= len;
+        dz /= len;
+        for (double dist : new double[]{0.8, 1.3, 1.9}) {
+            double x = getX() + dx * dist;
+            double z = getZ() + dz * dist;
+            for (double dy : new double[]{0.0, 1.0}) {
+                boolean fitsCrawling = level().noCollision(this, CRAWL_DIMENSIONS.makeBoundingBox(x, getY() + dy, z));
+                boolean fitsStanding = level().noCollision(this, MONSTER_DIMENSIONS.makeBoundingBox(x, getY() + dy, z));
+                if (fitsCrawling && !fitsStanding) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void updateCrawl() {
+        if (!isMonsterForm()) {
+            setCrawling(false);
+            return;
+        }
+        if (tickCount % 5 != 0) {
+            return;
+        }
+        if (isCrawling()) {
+            crawlTicks += 5;
+            // Se levanta cuando ya hay sitio y pasó un rato desde que se agachó.
+            if (crawlTicks > 40 && canStandUp()) {
+                setCrawling(false);
+            }
+            return;
+        }
+        LivingEntity target = getTarget();
+        if (target != null && (getNavigation().isDone() || horizontalCollision) && lowGapAhead(target)) {
+            setCrawling(true);
+            getNavigation().stop();
+        }
     }
 
     /** Nombre del tipo de aldeano que imita (plains, desert, ...). */
@@ -240,6 +317,8 @@ public class MimicEntity extends Monster {
     public void tick() {
         transformProgressO = transformProgress;
         transformProgress = getTransformTicks() / (float) TRANSFORM_TICKS;
+        crawlProgressO = crawlProgress;
+        crawlProgress = Mth.clamp(crawlProgress + (isCrawling() ? 0.2F : -0.2F), 0.0F, 1.0F);
         super.tick();
         if (!level().isClientSide) {
             serverTick();
@@ -288,6 +367,8 @@ public class MimicEntity extends Monster {
             }
         }
 
+        updateCrawl();
+
         if (monster) {
             HideManager.mimicSense(this);
             if (tickCount % 80 == 0 && random.nextInt(3) == 0) {
@@ -331,7 +412,7 @@ public class MimicEntity extends Monster {
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-        if (DATA_TRANSFORM.equals(key)) {
+        if (DATA_TRANSFORM.equals(key) || DATA_CRAWL.equals(key)) {
             refreshDimensions();
         }
     }
@@ -342,8 +423,10 @@ public class MimicEntity extends Monster {
         if (p <= 0.0F) {
             return super.getDimensions(pose);
         }
-        return p >= 1.0F ? MONSTER_DIMENSIONS : EntityDimensions.scalable(
-                Mth.lerp(p, 0.6F, 0.7F), Mth.lerp(p, 1.95F, 2.3F));
+        if (p >= 1.0F) {
+            return isCrawling() ? CRAWL_DIMENSIONS : MONSTER_DIMENSIONS;
+        }
+        return EntityDimensions.scalable(0.6F, Mth.lerp(p, 1.95F, 1.9F));
     }
 
     @Override

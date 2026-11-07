@@ -116,6 +116,7 @@ public class MimicModel extends EntityModel<MimicEntity> {
         nose.setPos(0.0F, noseY - 3.0F, 4.0F * (noseZ - 1.0F));
 
         body.xScale = 1.0F;
+        body.y = 0.0F;
         body.yScale = 1.0F + 0.15F * m;
         jacket.visible = m < 0.9F;
 
@@ -197,6 +198,45 @@ public class MimicModel extends EntityModel<MimicEntity> {
         armsCross.xRot = armBaseX;
         rightArm.zRot = 0.12F * m;
         leftArm.zRot = -0.12F * m;
+
+        applyCrawlPose(mimic, partial, swing, limbSwingAmount, headPitch);
+    }
+
+    /**
+     * A cuatro patas, pegado al suelo, para colarse por ventanas de un bloque. Las posiciones salen de rotar
+     * el torso 1,2 rad alrededor del cuello: hombros y caderas quedan adelantados/atrasados en consecuencia.
+     */
+    private void applyCrawlPose(MimicEntity mimic, float partial, float swing, float limbSwingAmount, float headPitch) {
+        float c = mimic.getCrawlProgress(partial);
+        if (c <= 0.0F) {
+            return;
+        }
+        float stride = Mth.cos(swing) * Math.min(1.0F, limbSwingAmount * 1.6F);
+
+        body.y = 12.0F * c;
+        body.xRot = Mth.lerp(c, body.xRot, 1.2F);
+
+        head.y = Mth.lerp(c, head.y, 12.0F);
+        head.z = Mth.lerp(c, head.z, -1.0F);
+        head.xRot = Mth.lerp(c, head.xRot, -0.8F + headPitch * DEG * 0.3F);
+
+        rightArm.y = Mth.lerp(c, rightArm.y, 13.1F);
+        leftArm.y = Mth.lerp(c, leftArm.y, 13.1F);
+        rightArm.z = Mth.lerp(c, rightArm.z, 1.8F);
+        leftArm.z = Mth.lerp(c, leftArm.z, 1.8F);
+        rightArm.yScale = Mth.lerp(c, rightArm.yScale, 1.8F);
+        leftArm.yScale = Mth.lerp(c, leftArm.yScale, 1.8F);
+        rightArm.xRot = Mth.lerp(c, rightArm.xRot, -0.3F + stride * 0.8F);
+        leftArm.xRot = Mth.lerp(c, leftArm.xRot, -0.3F - stride * 0.8F);
+
+        rightLeg.y = Mth.lerp(c, rightLeg.y, 13.4F);
+        leftLeg.y = Mth.lerp(c, leftLeg.y, 13.4F);
+        rightLeg.z = Mth.lerp(c, rightLeg.z, 11.2F);
+        leftLeg.z = Mth.lerp(c, leftLeg.z, 11.2F);
+        rightLeg.yScale = Mth.lerp(c, rightLeg.yScale, 0.64F);
+        leftLeg.yScale = Mth.lerp(c, leftLeg.yScale, 0.64F);
+        rightLeg.xRot = Mth.lerp(c, rightLeg.xRot, 0.3F - stride * 0.7F);
+        leftLeg.xRot = Mth.lerp(c, leftLeg.xRot, 0.3F + stride * 0.7F);
     }
 
     @Override
