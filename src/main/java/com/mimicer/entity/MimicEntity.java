@@ -86,6 +86,10 @@ public class MimicEntity extends Monster {
     private float crawlProgress;
     private float crawlProgressO;
     private int crawlTicks;
+    private int crawlCooldown;
+    private int noPathTicks;
+    private double holeFloorY = Double.NaN;
+    private int holeTick;
     private boolean speedApplied;
     private boolean lastMonster;
     private int revealTicks;
@@ -184,16 +188,55 @@ public class MimicEntity extends Monster {
         if (isCrawling()) {
             crawlTicks += 5;
             // Se levanta cuando ya hay sitio y pasó un rato desde que se agachó.
-            if (crawlTicks > 40 && canStandUp()) {
+            if (crawlTicks > 60 && canStandUp()) {
                 setCrawling(false);
             }
             return;
         }
+        if (crawlCooldown > 0) {
+            crawlCooldown -= 5;
+        }
         LivingEntity target = getTarget();
-        if (target != null && (getNavigation().isDone() || horizontalCollision) && lowGapAhead(target)) {
+        if (target == null) {
+            noPathTicks = 0;
+            return;
+        }
+        boolean idle = getNavigation().isDone();
+        noPathTicks = idle && distanceTo(target) > 3.0F ? noPathTicks + 5 : 0;
+        boolean gapAhead = (idle || horizontalCollision) && lowGapAhead(target);
+        // Si lleva un rato sin poder llegar, prueba agachado: quizá el camino es un túnel o una ventana bajos.
+        if (crawlCooldown <= 0 && (gapAhead || noPathTicks >= 40)) {
             setCrawling(true);
+            crawlCooldown = 200;
+            noPathTicks = 0;
             getNavigation().stop();
         }
+    }
+
+    // ------------------------------------------------------------------ hoyos
+
+    /** De noche se atreve a saltar a pozos profundos para llegar a su presa. */
+    @Override
+    public int getMaxFallDistance() {
+        return isMonsterForm() ? 14 : super.getMaxFallDistance();
+    }
+
+    @Override
+    public boolean causeFallDamage(float distance, float multiplier, DamageSource source) {
+        if (isMonsterForm()) {
+            if (distance >= 2.0F) {
+                holeFloorY = getY();
+                holeTick = tickCount;
+            }
+            return false;
+        }
+        return super.causeFallDamage(distance, multiplier, source);
+    }
+
+    /** Solo trepa para salir de un hoyo en el que acaba de caer, no por cualquier pared. */
+    @Override
+    public boolean onClimbable() {
+        return isMonsterForm() && horizontalCollision && !Double.isNaN(holeFloorY) && getY() < holeFloorY + 10.0;
     }
 
     /** Nombre del tipo de aldeano que imita (plains, desert, ...). */
@@ -368,6 +411,16 @@ public class MimicEntity extends Monster {
         }
 
         updateCrawl();
+        // Ya salió del hoyo (o pasó demasiado tiempo): deja de poder trepar.
+        if (!Double.isNaN(holeFloorY)
+                && ((onGround() && getY() > holeFloorY + 1.2) || tickCount - holeTick > 600)) {
+            holeFloorY = Double.NaN;
+        }
+        // Dentro de un hoyo no hay camino de salida para el navegador: empuja en línea recta hacia la presa y trepa.
+        if (monster && !Double.isNaN(holeFloorY) && getTarget() != null && getNavigation().isDone()) {
+            LivingEntity prey = getTarget();
+            getMoveControl().setWantedPosition(prey.getX(), prey.getY(), prey.getZ(), 1.0D);
+        }
 
         if (monster) {
             HideManager.mimicSense(this);
