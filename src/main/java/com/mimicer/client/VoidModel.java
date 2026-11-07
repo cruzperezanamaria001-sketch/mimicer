@@ -130,12 +130,32 @@ public class VoidModel extends EntityModel<VoidEntity> {
             foreR.xRot = -0.15F;
         }
 
+        boolean duck = e.isDucking();
+        if (duck) {
+            body.xRot += 0.6F;
+            head.xRot -= 0.35F;
+            if (!grab) {
+                armL.xRot += 0.5F;
+                armR.xRot += 0.5F;
+            }
+        }
+        float drop = duck ? 6.0F : 0.0F;
+        body.y = 6.0F + drop;
+        legL.y = 6.0F + drop;
+        legR.y = 6.0F + drop;
+
         // Piernas: zancadas largas con rodilla hacia atrás.
         float stride = chase ? 1.3F : 0.9F;
         legL.xRot = Mth.cos(sw) * stride * amt - 0.1F;
         legR.xRot = Mth.cos(sw + Mth.PI) * stride * amt - 0.1F;
         shinL.xRot = Math.max(0.0F, Mth.sin(sw)) * 1.2F * amt + 0.2F;
         shinR.xRot = Math.max(0.0F, Mth.sin(sw + Mth.PI)) * 1.2F * amt + 0.2F;
+        if (duck) {
+            legL.xRot = -0.9F + legL.xRot * 0.4F;
+            legR.xRot = -0.9F + legR.xRot * 0.4F;
+            shinL.xRot = 1.7F;
+            shinR.xRot = 1.7F;
+        }
         legL.zRot = -0.04F;
         legR.zRot = 0.04F;
     }

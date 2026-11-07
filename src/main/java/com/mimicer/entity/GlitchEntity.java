@@ -90,6 +90,15 @@ public class GlitchEntity extends Monster implements GeoEntity {
     private static final RawAnimation A_HEAD_TURN = RawAnimation.begin().thenLoop(P + "head_turn");
     private static final RawAnimation A_SHARDS = RawAnimation.begin().thenLoop(P + "shards");
 
+    private static final EntityDataAccessor<Boolean> DATA_DUCK =
+            SynchedEntityData.defineId(GlitchEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final net.minecraft.world.entity.EntityDimensions STAND_DIMS =
+            net.minecraft.world.entity.EntityDimensions.scalable(0.6F, 2.0F);
+    private static final net.minecraft.world.entity.EntityDimensions DUCK_DIMS =
+            net.minecraft.world.entity.EntityDimensions.scalable(0.6F, 1.4F);
+    private static final RawAnimation A_CROUCH = RawAnimation.begin().thenLoop(P + "crouch");
+    private static final RawAnimation A_CROUCH_WALK = RawAnimation.begin().thenLoop(P + "crouch_walk");
+
     private static final DustParticleOptions PURPLE = new DustParticleOptions(new Vector3f(0.7F, 0.05F, 1.0F), 1.3F);
     private static final double BEAM_SPEED = 4.0D;
     private static final double BEAM_RANGE = 36.0D;
@@ -104,6 +113,8 @@ public class GlitchEntity extends Monster implements GeoEntity {
     private int scareCooldown = 200;
     private int beamCooldown;
     private int stuckTicks;
+    private int duckTicks;
+    private int duckCooldown;
     private int corruptedCount;
     private int corruptBudget;
     private int lastCorruptSound;
@@ -121,6 +132,60 @@ public class GlitchEntity extends Monster implements GeoEntity {
     public GlitchEntity(EntityType<? extends GlitchEntity> type, Level level) {
         super(type, level);
         this.xpReward = 25;
+        if (getNavigation() instanceof net.minecraft.world.entity.ai.navigation.GroundPathNavigation nav) {
+            nav.setCanOpenDoors(true);
+            nav.setCanPassDoors(true);
+        }
+    }
+
+    // ---- agacharse para pasar por huecos bajos
+
+    public boolean isDucking() {
+        return this.entityData.get(DATA_DUCK);
+    }
+
+    private void setDucking(boolean duck) {
+        if (isDucking() != duck) {
+            this.entityData.set(DATA_DUCK, duck);
+            duckTicks = 0;
+            refreshDimensions();
+        }
+    }
+
+    @Override
+    public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
+        super.onSyncedDataUpdated(key);
+        if (DATA_DUCK.equals(key)) {
+            refreshDimensions();
+        }
+    }
+
+    @Override
+    public net.minecraft.world.entity.EntityDimensions getDimensions(net.minecraft.world.entity.Pose pose) {
+        return isDucking() ? DUCK_DIMS : STAND_DIMS;
+    }
+
+    /** Se agacha si delante hay un hueco que solo cabe agachado; se levanta cuando hay sitio. */
+    private void updateDuck() {
+        if (tickCount % 5 != 0) {
+            return;
+        }
+        if (duckCooldown > 0) {
+            duckCooldown -= 5;
+        }
+        if (isDucking()) {
+            duckTicks += 5;
+            if (duckTicks > 40 && com.mimicer.util.Ducking.fits(this, STAND_DIMS)) {
+                setDucking(false);
+            }
+            return;
+        }
+        Vec3 mv = getDeltaMovement();
+        if (duckCooldown <= 0 && getNavigation().isInProgress()
+                && com.mimicer.util.Ducking.gapAhead(this, STAND_DIMS, DUCK_DIMS, new Vec3(mv.x, 0.0, mv.z))) {
+            setDucking(true);
+            duckCooldown = 100;
+        }
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -147,11 +212,13 @@ public class GlitchEntity extends Monster implements GeoEntity {
         this.entityData.define(DATA_ACTION, ACT_NONE);
         this.entityData.define(DATA_MODE, MODE_OBSERVE);
         this.entityData.define(DATA_WATCHING, false);
+        this.entityData.define(DATA_DUCK, false);
     }
 
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.OpenDoorGoal(this, false));
     }
 
     public int getAction() {
@@ -191,6 +258,9 @@ public class GlitchEntity extends Monster implements GeoEntity {
             case ACT_SHOOT: return state.setAndContinue(A_SHOOT);
             case ACT_BREAK: return state.setAndContinue(A_BREAK);
             default: break;
+        }
+        if (isDucking()) {
+            return state.setAndContinue(state.isMoving() ? A_CROUCH_WALK : A_CROUCH);
         }
         if (state.isMoving()) {
             int mode = getMode();
@@ -254,6 +324,11 @@ public class GlitchEntity extends Monster implements GeoEntity {
             startCorrupt(chaser);
         }
 
+        updateDuck();
+        if (isDucking() && getMode() == MODE_OBSERVE && !getNavigation().isInProgress() && tickCount % 5 == 0
+                && duckTicks > 20 && com.mimicer.util.Ducking.fits(this, STAND_DIMS)) {
+            setDucking(false);
+        }
         switch (getMode()) {
             case MODE_OBSERVE -> tickObserve(level);
             case MODE_APPROACH -> tickApproach(level);
@@ -572,6 +647,13 @@ public class GlitchEntity extends Monster implements GeoEntity {
             stuckTicks = 0;
         }
         lastPos = position();
+        if (stuckTicks >= 20 && !isDucking() && duckCooldown <= 0) {
+            setDucking(true);       // antes de romper nada, prueba agachado
+            duckCooldown = 100;
+            stuckTicks = 0;
+            getNavigation().stop();
+            return;
+        }
         if (stuckTicks < 30) return;
         stuckTicks = 0;
         Direction d = getDirection();

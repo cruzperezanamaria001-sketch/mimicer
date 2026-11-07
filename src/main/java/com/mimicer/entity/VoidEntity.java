@@ -54,6 +54,13 @@ public class VoidEntity extends Monster {
     private static final EntityDataAccessor<Boolean> DATA_GRABBING =
             SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.BOOLEAN);
 
+    private static final EntityDataAccessor<Boolean> DATA_DUCK =
+            SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDimensions STAND_DIMS = EntityDimensions.scalable(0.6F, 2.9F);
+    private static final EntityDimensions DUCK_DIMS = EntityDimensions.scalable(0.6F, 1.9F);
+
+    private int duckTicks;
+    private int duckCooldown;
     private LivingEntity grabbed;
     private int grabTicks;
     private int slamCooldown;
@@ -66,6 +73,59 @@ public class VoidEntity extends Monster {
     public VoidEntity(EntityType<? extends VoidEntity> type, Level level) {
         super(type, level);
         this.xpReward = 30;
+        if (getNavigation() instanceof net.minecraft.world.entity.ai.navigation.GroundPathNavigation nav) {
+            nav.setCanOpenDoors(true);
+            nav.setCanPassDoors(true);
+        }
+    }
+
+    // ---- agacharse para pasar por huecos de 2 bloques
+
+    public boolean isDucking() {
+        return this.entityData.get(DATA_DUCK);
+    }
+
+    private void setDucking(boolean duck) {
+        if (isDucking() != duck) {
+            this.entityData.set(DATA_DUCK, duck);
+            duckTicks = 0;
+            refreshDimensions();
+        }
+    }
+
+    @Override
+    public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
+        super.onSyncedDataUpdated(key);
+        if (DATA_DUCK.equals(key)) {
+            refreshDimensions();
+        }
+    }
+
+    @Override
+    public EntityDimensions getDimensions(Pose pose) {
+        return isDucking() ? DUCK_DIMS : STAND_DIMS;
+    }
+
+    private void updateDuck(LivingEntity target) {
+        if (tickCount % 5 != 0) {
+            return;
+        }
+        if (duckCooldown > 0) {
+            duckCooldown -= 5;
+        }
+        if (isDucking()) {
+            duckTicks += 5;
+            if (duckTicks > 40 && com.mimicer.util.Ducking.fits(this, STAND_DIMS)) {
+                setDucking(false);
+            }
+            return;
+        }
+        if (target != null && duckCooldown <= 0
+                && com.mimicer.util.Ducking.gapAhead(this, STAND_DIMS, DUCK_DIMS,
+                new Vec3(target.getX() - getX(), 0.0, target.getZ() - getZ()))) {
+            setDucking(true);
+            duckCooldown = 100;
+        }
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -81,12 +141,14 @@ public class VoidEntity extends Monster {
     protected void defineSynchedData() {
         super.defineSynchedData();
         this.entityData.define(DATA_GRABBING, false);
+        this.entityData.define(DATA_DUCK, false);
     }
 
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0D, true));
+        this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.OpenDoorGoal(this, false));
         this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 48.0F));
     }
 
@@ -132,6 +194,9 @@ public class VoidEntity extends Monster {
         if (getTarget() != null) {
             tickChase();
         } else {
+            if (isDucking() && tickCount % 5 == 0 && duckTicks++ > 8 && com.mimicer.util.Ducking.fits(this, STAND_DIMS)) {
+                setDucking(false);
+            }
             scanForPrey();
             tickTeleport();
         }
@@ -211,11 +276,19 @@ public class VoidEntity extends Monster {
             stopChase();
             return;
         }
-        // Es demasiado alto para pasar por puertas normales: si no encuentra camino, se teletransporta junto a su presa.
+        updateDuck(t);
+        // Si no encuentra camino, primero se agacha (cabe en huecos de 2 bloques); si aun así no llega, se teletransporta.
         if (getNavigation().isDone() && distanceTo(t) > 3.5F) {
             stuckTicks++;
         } else {
             stuckTicks = 0;
+        }
+        if (stuckTicks > 20 && !isDucking() && duckCooldown <= 0) {
+            setDucking(true);
+            duckCooldown = 100;
+            duckTicks = 0;
+            stuckTicks = 0;
+            getNavigation().stop();
         }
         if (stuckTicks > 40 && blinkCooldown <= 0) {
             stuckTicks = 0;
@@ -441,7 +514,7 @@ public class VoidEntity extends Monster {
 
     @Override
     protected float getStandingEyeHeight(Pose pose, EntityDimensions dims) {
-        return 2.55F;
+        return isDucking() ? 1.6F : 2.55F;
     }
 
     @Override
