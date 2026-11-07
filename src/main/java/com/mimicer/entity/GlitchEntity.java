@@ -114,6 +114,10 @@ public class GlitchEntity extends Monster implements GeoEntity {
     private int beamCooldown;
     private int stuckTicks;
     private int duckTicks;
+    private int noPathTicks;
+    private BlockPos barricadePos;
+    private BlockPos barricadeFollow;
+    private boolean aimingBarricade;
     private int duckCooldown;
     private int corruptedCount;
     private int corruptBudget;
@@ -393,6 +397,9 @@ public class GlitchEntity extends Monster implements GeoEntity {
         }
         if (tickCount % 10 == 0) {
             getNavigation().moveTo(p, 0.8D);
+            if (getAction() == ACT_NONE) {
+                tryBarricade(level, new Vec3(p.getX() - getX(), 0.0, p.getZ() - getZ()));
+            }
         }
         if (tickCount % 2 == 0 && scareCooldown <= 0) {
             for (ServerPlayer target : level.players()) {
@@ -514,7 +521,11 @@ public class GlitchEntity extends Monster implements GeoEntity {
     }
 
     private void faceTowards(Entity e) {
-        float yaw = (float) (Mth.atan2(e.getZ() - getZ(), e.getX() - getX()) * 180.0 / Math.PI) - 90.0F;
+        faceTowards(e.position());
+    }
+
+    private void faceTowards(Vec3 p) {
+        float yaw = (float) (Mth.atan2(p.z - getZ(), p.x - getX()) * 180.0 / Math.PI) - 90.0F;
         setYRot(yaw);
         yBodyRot = yaw;
         setYHeadRot(yaw);
@@ -534,7 +545,8 @@ public class GlitchEntity extends Monster implements GeoEntity {
             now.put(e.getId(), dist);
             boolean targeting = e instanceof Mob m && m.getTarget() == this;
             Double before = lastDist.get(e.getId());
-            boolean closing = before != null && before - dist >= 1.2 && dist < 10.0;
+            double need = e instanceof Player ? 2.3 : 1.2;      // un jugador solo cuenta si corre hacia él
+            boolean closing = before != null && before - dist >= need && dist < 10.0;
             if ((targeting || closing) && (found == null || dist < found.distanceTo(this))) {
                 found = e;
             }
@@ -579,6 +591,9 @@ public class GlitchEntity extends Monster implements GeoEntity {
                 getNavigation().moveTo(away.x, away.y, away.z, 1.0D);
             }
             checkStuck(level);
+            if (getAction() == ACT_NONE) {
+                tryBarricade(level, new Vec3(getX() - threat.x, 0.0, getZ() - threat.z));
+            }
         }
         if (tickCount % 4 == 0) {
             corruptBelow(level);
@@ -647,6 +662,12 @@ public class GlitchEntity extends Monster implements GeoEntity {
             stuckTicks = 0;
         }
         lastPos = position();
+        BlockPos barricade = com.mimicer.util.Barricades.find(this, Vec3.directionFromRotation(0.0F, yBodyRot), 2);
+        if (stuckTicks >= 20 && barricade != null) {
+            stuckTicks = 0;
+            startBarricadeShot(level, barricade, 30);
+            return;
+        }
         if (stuckTicks >= 20 && !isDucking() && duckCooldown <= 0) {
             setDucking(true);       // antes de romper nada, prueba agachado
             duckCooldown = 100;
@@ -706,13 +727,28 @@ public class GlitchEntity extends Monster implements GeoEntity {
 
     private void tickCharge(ServerLevel level) {
         getNavigation().stop();
-        if (beamTarget == null || !beamTarget.isAlive()) {
-            setAction(ACT_NONE, 0);
-            beamCooldown = 60;
-            return;
+        Vec3 aim;
+        if (aimingBarricade) {
+            if (barricadePos == null || !isShootableBarricade(level.getBlockState(barricadePos))) {
+                aimingBarricade = false;
+                barricadePos = null;
+                barricadeFollow = null;
+                setAction(ACT_NONE, 0);
+                return;
+            }
+            aim = barricadePos.getCenter();
+            faceTowards(aim);
+            getLookControl().setLookAt(aim.x, aim.y, aim.z);
+        } else {
+            if (beamTarget == null || !beamTarget.isAlive()) {
+                setAction(ACT_NONE, 0);
+                beamCooldown = 60;
+                return;
+            }
+            faceTowards(beamTarget);
+            getLookControl().setLookAt(beamTarget, 60.0F, 60.0F);
+            aim = beamTarget.position().add(0.0, beamTarget.getBbHeight() * 0.6, 0.0);
         }
-        faceTowards(beamTarget);
-        getLookControl().setLookAt(beamTarget, 60.0F, 60.0F);
         Vec3 h = handPos();
         if (actionTicks % 2 == 0) {
             double r = 0.3 + actionTicks * 0.04;
@@ -722,7 +758,7 @@ public class GlitchEntity extends Monster implements GeoEntity {
         }
         if (--actionTicks <= 0) {
             beamStart = h;
-            Vec3 to = beamTarget.position().add(0.0, beamTarget.getBbHeight() * 0.6, 0.0).subtract(h);
+            Vec3 to = aim.subtract(h);
             beamDir = to.lengthSqr() < 1.0E-4 ? Vec3.directionFromRotation(0.0F, yBodyRot) : to.normalize();
             beamDist = 0.0;
             beamHit.clear();
@@ -731,11 +767,82 @@ public class GlitchEntity extends Monster implements GeoEntity {
         }
     }
 
+    // ------------------------------------------------------------------ barricadas: las glitchea y luego las corrompe
+
+    private static boolean isShootableBarricade(BlockState s) {
+        return com.mimicer.util.Barricades.isBarricade(s) || s.is(ModBlocks.GLITCHED_BARRICADE.get());
+    }
+
+    private void startBarricadeShot(ServerLevel level, BlockPos pos, int chargeTicks) {
+        barricadePos = pos;
+        aimingBarricade = true;
+        getNavigation().stop();
+        setAction(ACT_CHARGE, chargeTicks);
+        level.playSound(null, getX(), getY(), getZ(), ModSounds.GLITCH_CHARGE.get(), SoundSource.HOSTILE, 2.0F, 1.0F);
+    }
+
+    /** Sin camino durante un rato: si hay una barricada en esa dirección, le dispara. */
+    private boolean tryBarricade(ServerLevel level, Vec3 dir) {
+        if (!getNavigation().isDone()) {
+            noPathTicks = 0;
+            return false;
+        }
+        noPathTicks += 10;
+        if (noPathTicks < 30) {
+            return false;
+        }
+        BlockPos b = com.mimicer.util.Barricades.find(this, dir, 2);
+        if (b == null) {
+            return false;
+        }
+        noPathTicks = 0;
+        startBarricadeShot(level, b, 30);
+        return true;
+    }
+
+    /** Primer disparo: la puerta o tabla se vuelve glitcheada. Segundo disparo: se corrompe y desaparece. */
+    private void hitBarricade(ServerLevel level) {
+        BlockPos pos = barricadePos;
+        if (pos == null) return;
+        BlockState st = level.getBlockState(pos);
+        BlockState glitched = ModBlocks.GLITCHED_BARRICADE.get().defaultBlockState();
+        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 16, 0.4, 0.6, 0.4, 0.3);
+        if (st.is(ModBlocks.GLITCHED_BARRICADE.get())) {
+            // segunda fase: desaparece (junto a las celdas glitcheadas contiguas de la misma puerta)
+            BlockPos lo = pos, hi = pos;
+            for (int i = 0; i < 2; i++) {
+                if (level.getBlockState(lo.below()).is(ModBlocks.GLITCHED_BARRICADE.get())) lo = lo.below();
+                if (level.getBlockState(hi.above()).is(ModBlocks.GLITCHED_BARRICADE.get())) hi = hi.above();
+            }
+            for (BlockPos p = lo; p.getY() <= hi.getY(); p = p.above()) {
+                level.sendParticles(ParticleTypes.REVERSE_PORTAL, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 24, 0.4, 0.5, 0.4, 0.15);
+                level.sendParticles(PURPLE, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 10, 0.4, 0.5, 0.4, 0.05);
+                level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            }
+            level.playSound(null, pos, ModSounds.GLITCH_CORRUPT.get(), SoundSource.HOSTILE, 1.5F, 0.6F);
+            barricadeFollow = null;
+        } else if (com.mimicer.util.Barricades.isBarricade(st)) {
+            if (st.getBlock() instanceof net.minecraft.world.level.block.DoorBlock) {
+                BlockPos other = st.getValue(net.minecraft.world.level.block.DoorBlock.HALF)
+                        == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER ? pos.above() : pos.below();
+                level.setBlock(other, glitched, 2);
+            }
+            level.setBlock(pos, glitched, 2);
+            level.playSound(null, pos, ModSounds.GLITCH_CORRUPT.get(), SoundSource.HOSTILE, 1.2F, 1.0F);
+            barricadeFollow = pos;       // vuelve a dispararle enseguida
+        }
+    }
+
     private void tickShoot(ServerLevel level) {
         getNavigation().stop();
         if (beamDist < BEAM_RANGE) {
             for (int i = 0; i < (int) BEAM_SPEED && beamDist < BEAM_RANGE; i++, beamDist += 1.0) {
                 Vec3 pos = beamStart.add(beamDir.scale(beamDist));
+                if (aimingBarricade && barricadePos != null && pos.distanceToSqr(barricadePos.getCenter()) < 0.8) {
+                    hitBarricade(level);
+                    beamDist = BEAM_RANGE;
+                    break;
+                }
                 if (level.getBlockState(BlockPos.containing(pos)).isSolidRender(level, BlockPos.containing(pos))) {
                     beamDist = BEAM_RANGE;      // el rayo se detiene contra los bloques
                     level.sendParticles(ParticleTypes.ELECTRIC_SPARK, pos.x, pos.y, pos.z, 8, 0.3, 0.3, 0.3, 0.2);
@@ -745,6 +852,7 @@ public class GlitchEntity extends Monster implements GeoEntity {
                 if (i % 2 == 0) {
                     level.sendParticles(ParticleTypes.ELECTRIC_SPARK, pos.x, pos.y, pos.z, 1, 0.15, 0.15, 0.15, 0.1);
                 }
+                if (aimingBarricade) continue;
                 for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(pos, pos).inflate(0.9),
                         x -> x != this && !(x instanceof GlitchEntity) && x.isAlive())) {
                     if (e instanceof Player pl && (pl.isSpectator() || pl.isCreative())) continue;
@@ -761,6 +869,17 @@ public class GlitchEntity extends Monster implements GeoEntity {
         }
         if (--actionTicks <= 0) {
             setAction(ACT_NONE, 0);
+            if (aimingBarricade) {
+                aimingBarricade = false;
+                if (barricadeFollow != null) {
+                    BlockPos next = barricadeFollow;
+                    barricadeFollow = null;
+                    startBarricadeShot(level, next, 20);       // segundo disparo
+                } else {
+                    barricadePos = null;
+                }
+                return;
+            }
             beamTarget = null;
             beamCooldown = 160 + random.nextInt(160);
             setMode(MODE_REST, 30);
@@ -773,11 +892,8 @@ public class GlitchEntity extends Monster implements GeoEntity {
     public boolean hurt(DamageSource source, float amount) {
         boolean result = super.hurt(source, amount);
         if (result && !level().isClientSide && source.getEntity() instanceof LivingEntity attacker
-                && !(attacker instanceof GlitchEntity) && getAction() == ACT_NONE) {
-            chaser = attacker;
-            if (getMode() != MODE_CORRUPT) {
-                startCorrupt(attacker);
-            }
+                && !(attacker instanceof GlitchEntity)) {
+            chaser = attacker;       // empezará a corromper en cuanto termine su acción actual
         }
         return result;
     }

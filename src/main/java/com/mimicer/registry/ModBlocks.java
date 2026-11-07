@@ -38,4 +38,11 @@ public class ModBlocks {
                     .noLootTable()
                     .instabreak()
                     .pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)));
+
+    public static final RegistryObject<Block> GLITCHED_BARRICADE = BLOCKS.register("glitched_barricade",
+            () -> new com.mimicer.block.GlitchBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_PURPLE)
+                    .strength(1.0F, 3.0F)
+                    .sound(SoundType.AMETHYST)
+                    .lightLevel(state -> 6)));
 }

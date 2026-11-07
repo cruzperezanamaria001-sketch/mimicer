@@ -59,6 +59,8 @@ public class VoidEntity extends Monster {
     private static final EntityDimensions STAND_DIMS = EntityDimensions.scalable(0.6F, 2.9F);
     private static final EntityDimensions DUCK_DIMS = EntityDimensions.scalable(0.6F, 1.9F);
 
+    private net.minecraft.core.BlockPos throwPos;
+    private int throwTicks;
     private int duckTicks;
     private int duckCooldown;
     private LivingEntity grabbed;
@@ -187,6 +189,10 @@ public class VoidEntity extends Monster {
         if (blinkCooldown > 0) {
             blinkCooldown--;
         }
+        if (throwPos != null) {
+            tickThrow();
+            return;
+        }
         if (grabbed != null) {
             tickGrab();
             return;
@@ -283,6 +289,14 @@ public class VoidEntity extends Monster {
         } else {
             stuckTicks = 0;
         }
+        if (stuckTicks > 8 && throwPos == null) {
+            net.minecraft.core.BlockPos b = com.mimicer.util.Barricades.find(this,
+                    new Vec3(t.getX() - getX(), 0.0, t.getZ() - getZ()), 2);
+            if (b != null) {
+                startThrow(b);
+                return;
+            }
+        }
         if (stuckTicks > 20 && !isDucking() && duckCooldown <= 0) {
             setDucking(true);
             duckCooldown = 100;
@@ -296,6 +310,75 @@ public class VoidEntity extends Monster {
                 blinkCooldown = 100;
             }
         }
+    }
+
+    // ------------------------------------------------------------------ barricadas: las agarra y las lanza
+
+    private void startThrow(net.minecraft.core.BlockPos pos) {
+        throwPos = pos;
+        throwTicks = 0;
+        this.entityData.set(DATA_GRABBING, true);       // misma pose de brazos en alto que al agarrar
+        this.goalSelector.disableControlFlag(net.minecraft.world.entity.ai.goal.Goal.Flag.MOVE);
+        getNavigation().stop();
+        playSound(SoundEvents.ENDERMAN_STARE, 2.0F, 0.4F);
+    }
+
+    private void endThrow() {
+        throwPos = null;
+        throwTicks = 0;
+        stuckTicks = 0;
+        this.entityData.set(DATA_GRABBING, false);
+        this.goalSelector.enableControlFlag(net.minecraft.world.entity.ai.goal.Goal.Flag.MOVE);
+    }
+
+    private void tickThrow() {
+        getNavigation().stop();
+        BlockState st = level().getBlockState(throwPos);
+        if (!com.mimicer.util.Barricades.isBarricade(st)) {
+            endThrow();
+            return;
+        }
+        Vec3 c = throwPos.getCenter();
+        getLookControl().setLookAt(c.x, c.y, c.z);
+        float yaw = (float) (Mth.atan2(c.z - getZ(), c.x - getX()) * 180.0 / Math.PI) - 90.0F;
+        setYRot(yaw);
+        yBodyRot = yaw;
+        setYHeadRot(yaw);
+        throwTicks++;
+        if (throwTicks == 10) {
+            playSound(SoundEvents.WOOD_BREAK, 1.5F, 0.5F);
+        }
+        if (throwTicks >= 24 && level() instanceof ServerLevel sl) {
+            doThrow(sl, st);
+        }
+    }
+
+    /** Arranca la puerta o la tabla del marco y la lanza hacia delante; el camino queda libre. */
+    private void doThrow(ServerLevel level, BlockState st) {
+        net.minecraft.core.BlockPos main = throwPos;
+        if (st.getBlock() instanceof net.minecraft.world.level.block.DoorBlock) {
+            if (st.getValue(net.minecraft.world.level.block.DoorBlock.HALF)
+                    == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER) {
+                main = main.below();
+                st = level.getBlockState(main);
+            }
+            level.setBlock(main.above(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 35);
+        }
+        LivingEntity t = getTarget();
+        Vec3 c = main.getCenter();
+        Vec3 dir = t != null ? new Vec3(t.getX() - c.x, 0.0, t.getZ() - c.z)
+                : Vec3.directionFromRotation(0.0F, yBodyRot);
+        dir = new Vec3(dir.x, 0.0, dir.z);
+        dir = dir.lengthSqr() < 1.0E-4 ? Vec3.directionFromRotation(0.0F, yBodyRot) : dir.normalize();
+        level.levelEvent(2001, main, net.minecraft.world.level.block.Block.getId(st));
+        net.minecraft.world.entity.item.FallingBlockEntity fb =
+                net.minecraft.world.entity.item.FallingBlockEntity.fall(level, main, st);
+        fb.disableDrop();
+        fb.setHurtsEntities(2.0F, 40);
+        fb.setDeltaMovement(dir.x * 1.1, 0.4, dir.z * 1.1);
+        fb.hurtMarked = true;
+        level.playSound(null, main, SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 1.5F, 0.6F);
+        endThrow();
     }
 
     // ------------------------------------------------------------------ agarre y estampido
@@ -389,6 +472,9 @@ public class VoidEntity extends Monster {
     public void die(DamageSource source) {
         if (!level().isClientSide) {
             releaseGrab();
+            if (throwPos != null) {
+                endThrow();
+            }
         }
         super.die(source);
     }
