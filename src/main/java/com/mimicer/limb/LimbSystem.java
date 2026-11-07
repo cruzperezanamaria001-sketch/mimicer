@@ -78,6 +78,7 @@ public final class LimbSystem {
         tag.putInt(KEY_BLEED, 1200);
         Vec3 pos = limbPosition(victim, limb);
         spawnBlood(level, pos, 40);
+        com.mimicer.blood.BloodSystem.mutilation(level, victim, limb);
         level.playSound(null, victim.blockPosition(), SoundEvents.SKELETON_HURT, SoundSource.HOSTILE, 1.0F, 0.5F);
         level.playSound(null, victim.blockPosition(), SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.HOSTILE, 1.0F, 0.6F);
         applyEffects(victim);

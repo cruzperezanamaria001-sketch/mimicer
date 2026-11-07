@@ -151,6 +151,10 @@ public class CorpseEntity extends Entity {
             return;
         }
 
+        if (age % 40 == 0 && age < 1200 && carrierId == null && onGround()) {
+            com.mimicer.blood.BloodSystem.corpseSeep((ServerLevel) level(), this, getLimbs(), age);
+        }
+
         if (carrierId != null) {
             Entity carrier = ((ServerLevel) level()).getEntity(carrierId);
             if (carrier instanceof MimicEntity mimic && mimic.isAlive() && mimic.getCarried() == this) {

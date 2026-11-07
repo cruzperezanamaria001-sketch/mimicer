@@ -1,0 +1,1 @@
+{"textures": {"particle": "mimicer:block/blood/stain_5_1", "s": "mimicer:block/blood/stain_5_1"}, "render_type": "minecraft:cutout", "elements": [{"from": [0.02, 0, 0], "to": [0.02, 16, 16], "shade": false, "faces": {"east": {"texture": "#s", "uv": [0, 0, 16, 16], "rotation": 90}}}]}

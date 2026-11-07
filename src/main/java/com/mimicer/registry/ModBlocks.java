@@ -28,4 +28,14 @@ public class ModBlocks {
                     .strength(2.0F, 6.0F)
                     .sound(SoundType.AMETHYST)
                     .lightLevel(state -> 4)));
+
+    public static final RegistryObject<Block> BLOOD_STAIN = BLOCKS.register("blood_stain",
+            () -> new com.mimicer.block.BloodStainBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_RED)
+                    .noCollission()
+                    .noOcclusion()
+                    .replaceable()
+                    .noLootTable()
+                    .instabreak()
+                    .pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)));
 }
