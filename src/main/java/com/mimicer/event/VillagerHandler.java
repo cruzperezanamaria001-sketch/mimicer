@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.common.Tags;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -160,6 +161,10 @@ public final class VillagerHandler {
 
     private static void seekShelter(ServerLevel level, Villager villager, Brain<Villager> brain,
                                     CompoundTag data, BlockPos origin) {
+        // Un aldeano dormido ya está a salvo en su cama: no se le toca el cerebro ni cierra puertas.
+        if (villager.isSleeping()) {
+            return;
+        }
         BlockPos shelter = findShelter(level, villager, brain, origin);
         double dist = Math.sqrt(villager.blockPosition().distSqr(shelter));
         if (dist > 2.5) {
@@ -170,9 +175,12 @@ public final class VillagerHandler {
         brain.eraseMemory(MemoryModuleType.WALK_TARGET);
         villager.getNavigation().stop();
         brain.setMemory(MemoryModuleType.LOOK_TARGET, new BlockPosTracker(shelter.above()));
-        closeDoors(level, villager);
         long now = level.getGameTime();
         boolean recentThreat = now - data.getLong(TAG_THREAT) < THREAT_RECENT_TICKS;
+        // Solo cierran puertas con una amenaza reciente; si no, la puerta se queda como esté.
+        if (recentThreat) {
+            closeDoors(level, villager);
+        }
         boolean justUnboarded = now - data.getLong(TAG_UNBOARD) < CALM_TICKS * 2L;
         if (recentThreat && !justUnboarded && data.getInt(TAG_BOARDS) < MAX_BOARDS
                 && villager.getRandom().nextFloat() < 0.6F) {
@@ -205,7 +213,24 @@ public final class VillagerHandler {
         return best != null ? best : origin;
     }
 
+    /** Hay un aldeano alarmado fuera (a la vista del cielo) intentando refugiarse cerca: no hay que cerrarle la puerta. */
+    private static boolean outsiderNear(ServerLevel level, BlockPos center, double radius, Villager self) {
+        long now = level.getGameTime();
+        for (Villager v : level.getEntitiesOfClass(Villager.class, new AABB(center).inflate(radius), x -> x != self)) {
+            if (v.isSleeping() || !level.canSeeSky(v.blockPosition())) {
+                continue;
+            }
+            if (now < v.getPersistentData().getLong(TAG_ALARM)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void closeDoors(ServerLevel level, Villager villager) {
+        if (outsiderNear(level, villager.blockPosition(), 9.0, villager)) {
+            return;
+        }
         BlockPos from = villager.blockPosition();
         for (BlockPos pos : BlockPos.betweenClosed(from.offset(-4, -1, -4), from.offset(4, 2, 4))) {
             BlockState state = level.getBlockState(pos);
@@ -218,6 +243,9 @@ public final class VillagerHandler {
 
     /** Coloca una Tabla en el lado interior de una puerta o ventana cercana. Devuelve si colocó alguna. */
     private static boolean placeBoard(ServerLevel level, Villager villager) {
+        if (outsiderNear(level, villager.blockPosition(), 12.0, villager)) {
+            return false;
+        }
         BlockPos from = villager.blockPosition();
         for (BlockPos pos : BlockPos.betweenClosed(from.offset(-5, -1, -5), from.offset(5, 3, 5))) {
             BlockState state = level.getBlockState(pos);

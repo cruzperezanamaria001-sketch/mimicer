@@ -6,7 +6,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.PacketDistributor;
 
@@ -114,20 +122,56 @@ public final class HideManager {
                 continue;
             }
             HideData data = entry.getValue();
-            double dist = mimic.position().distanceTo(Vec3.atCenterOf(data.bed));
-            if (dist > 4.5) {
+            // Solo cuenta si el Mímico está en la misma habitación que la cama: cerca de alguna de sus dos mitades
+            // y con una línea directa hasta ella. Estar al otro lado de una pared no sirve de nada.
+            BlockPos other = otherHalf(mimic.level(), data.bed);
+            double dist = Math.min(mimic.position().distanceTo(Vec3.atCenterOf(data.bed)),
+                    mimic.position().distanceTo(Vec3.atCenterOf(other)));
+            if (dist > 4.0 || !canSeeBed(mimic, data.bed, other)) {
                 continue;
             }
-            float add = dist < 2.0 ? 2.5F : 1.2F;
+            boolean adjacent = dist < 2.2;
+            float add = adjacent ? 2.5F : 0.6F;
             if (NoiseManager.recentNoiseNear(mimic.level(), player.position(), 8.0, 60)) {
-                add += 6.0F;
+                add += adjacent ? 6.0F : 1.5F;
             }
             data.suspicion += add;
             if (data.suspicion >= REVEAL_THRESHOLD) {
                 reveal(player, mimic);
                 return;
             }
+            // Si sospecha pero no se acerca, rompe la cama para sacarlo.
+            if (!adjacent && data.suspicion >= REVEAL_THRESHOLD * 0.5F && mimic.getRandom().nextInt(20) == 0) {
+                mimic.swing(InteractionHand.MAIN_HAND);
+                mimic.level().destroyBlock(data.bed, true, mimic);
+                reveal(player, mimic);
+                return;
+            }
         }
+    }
+
+    /** La otra mitad de la cama (la cabecera o los pies), tanto si se pulsó una como la otra. */
+    private static BlockPos otherHalf(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof BedBlock)) {
+            return pos;
+        }
+        Direction facing = state.getValue(BedBlock.FACING);
+        return state.getValue(BedBlock.PART) == BedPart.HEAD ? pos.relative(facing.getOpposite()) : pos.relative(facing);
+    }
+
+    /** Línea de visión desde los ojos del Mímico hasta alguna mitad de la cama, sin paredes ni cristales de por medio. */
+    private static boolean canSeeBed(MimicEntity mimic, BlockPos a, BlockPos b) {
+        Vec3 eye = mimic.getEyePosition();
+        for (BlockPos p : new BlockPos[]{a, b}) {
+            Vec3 target = new Vec3(p.getX() + 0.5, p.getY() + 0.3, p.getZ() + 0.5);
+            BlockHitResult hit = mimic.level().clip(new ClipContext(eye, target,
+                    ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mimic));
+            if (hit.getType() == HitResult.Type.MISS || hit.getBlockPos().equals(a) || hit.getBlockPos().equals(b)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void reveal(ServerPlayer player, MimicEntity mimic) {
