@@ -20,8 +20,15 @@ import java.util.Map;
 public class MimicRenderer extends MobRenderer<MimicEntity, MimicModel> {
     /** De día usa la textura exacta del aldeano de vainilla. */
     private static final ResourceLocation DAY = new ResourceLocation("textures/entity/villager/villager.png");
-    private static final ResourceLocation NIGHT = new ResourceLocation(MimicerMod.MOD_ID, "textures/entity/mimico.png");
-    private static final ResourceLocation EYES = new ResourceLocation(MimicerMod.MOD_ID, "textures/entity/mimico_ojos.png");
+    private static final ResourceLocation[] NIGHT = new ResourceLocation[MimicEntity.VARIANT_COUNT];
+    private static final ResourceLocation[] EYES = new ResourceLocation[MimicEntity.VARIANT_COUNT];
+
+    static {
+        for (int i = 0; i < MimicEntity.VARIANT_COUNT; i++) {
+            NIGHT[i] = new ResourceLocation(MimicerMod.MOD_ID, "textures/entity/mimico_" + i + ".png");
+            EYES[i] = new ResourceLocation(MimicerMod.MOD_ID, "textures/entity/mimico_ojos_" + i + ".png");
+        }
+    }
 
     public MimicRenderer(EntityRendererProvider.Context context) {
         super(context, new MimicModel(context.bakeLayer(MimicModel.LAYER)), 0.5F);
@@ -69,13 +76,13 @@ public class MimicRenderer extends MobRenderer<MimicEntity, MimicModel> {
     @Override
     public ResourceLocation getTextureLocation(MimicEntity mimic) {
         // El cambio de textura ocurre a mitad de la transformación, escondido por el temblor.
-        return mimic.getTransformTicks() >= MimicEntity.TRANSFORM_TICKS / 2 ? NIGHT : DAY;
+        return mimic.getTransformTicks() >= MimicEntity.TRANSFORM_TICKS / 2 ? NIGHT[mimic.getVariant()] : DAY;
     }
 
     @Override
     protected void scale(MimicEntity mimic, PoseStack poseStack, float partialTick) {
         float m = mimic.getTransformProgress(partialTick);
-        float s = 0.9375F * Mth.lerp(m, 1.0F, 1.04F);
+        float s = 0.9375F * Mth.lerp(m, 1.0F, 1.04F * mimic.getSizeScale());
         poseStack.scale(s, s, s);
     }
 
@@ -92,7 +99,7 @@ public class MimicRenderer extends MobRenderer<MimicEntity, MimicModel> {
             if (mimic.getTransformProgress(partialTick) < 0.5F || mimic.isInvisible()) {
                 return;
             }
-            VertexConsumer vc = buffer.getBuffer(RenderType.eyes(EYES));
+            VertexConsumer vc = buffer.getBuffer(RenderType.eyes(EYES[mimic.getVariant()]));
             getParentModel().renderToBuffer(poseStack, vc, 0xF000F0, OverlayTexture.NO_OVERLAY,
                     1.0F, 1.0F, 1.0F, 1.0F);
         }

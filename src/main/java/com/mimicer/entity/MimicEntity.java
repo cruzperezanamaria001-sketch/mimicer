@@ -7,7 +7,12 @@ import com.mimicer.entity.goal.MimicStalkWindowGoal;
 import com.mimicer.hide.HideManager;
 import com.mimicer.limb.LimbSystem;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -69,6 +74,12 @@ public class MimicEntity extends Monster {
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_THROW =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
+    /** Apariencia de la forma monstruosa (0..VARIANT_COUNT-1). */
+    private static final EntityDataAccessor<Integer> DATA_VARIANT =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_SIZE =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
+    public static final int VARIANT_COUNT = 5;
     private static final EntityDataAccessor<Boolean> DATA_CRAWL =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.BOOLEAN);
     /** Tipo de aldeano (bioma) y profesión que imita; vacío hasta que se asigna en el servidor. */
@@ -129,6 +140,160 @@ public class MimicEntity extends Monster {
         this.entityData.define(DATA_VTYPE, "");
         this.entityData.define(DATA_PROFESSION, "");
         this.entityData.define(DATA_CRAWL, false);
+        this.entityData.define(DATA_VARIANT, -1);
+        this.entityData.define(DATA_SIZE, 100);
+    }
+
+    // ------------------------------------------------------------------ habilidades por variante
+
+    public static final int V_CLASSIC = 0;
+    public static final int V_ASH = 1;
+    public static final int V_BONE = 2;
+    public static final int V_MOSS = 3;
+    public static final int V_FLAYED = 4;
+
+    private static final UUID FRENZY_ID = UUID.fromString("0b6c1f0e-7d8a-4f3b-9a55-2f4d8c1e6a22");
+
+    private int dashCooldown;
+    private int frenzyStacks;
+    private int frenzyTimer;
+
+    /**
+     * Clásico: embestida. Ceniza: inmune al fuego y prende a sus víctimas. Hueso: aura de frío que ralentiza.
+     * Musgo: veneno al golpear y se regenera. Desollado: frenesí, cada golpe lo acelera y le cura.
+     * Solo en forma monstruosa.
+     */
+    private void tickAbilities() {
+        if (!(level() instanceof ServerLevel sl) || isTransforming()) {
+            return;
+        }
+        switch (getVariant()) {
+            case V_CLASSIC -> tickCharge();
+            case V_ASH -> {
+                if (isOnFire()) {
+                    setRemainingFireTicks(0);
+                }
+                if (tickCount % 5 == 0) {
+                    sl.sendParticles(ParticleTypes.SMOKE, getX(), getY() + 1.2, getZ(), 2, 0.3, 0.5, 0.3, 0.01);
+                }
+                if (tickCount % 15 == 0) {
+                    sl.sendParticles(ParticleTypes.FLAME, getX(), getY() + 1.0, getZ(), 2, 0.3, 0.5, 0.3, 0.01);
+                }
+            }
+            case V_BONE -> tickFrost(sl);
+            case V_MOSS -> {
+                if (tickCount % 40 == 0 && getHealth() < getMaxHealth()) {
+                    heal(2.0F);
+                }
+                if (tickCount % 10 == 0) {
+                    sl.sendParticles(ParticleTypes.SPORE_BLOSSOM_AIR, getX(), getY() + 1.2, getZ(), 3, 0.4, 0.6, 0.4, 0.0);
+                }
+            }
+            case V_FLAYED -> tickFrenzy(sl);
+            default -> { }
+        }
+    }
+
+    /** Embestida: se lanza en línea recta contra su presa cuando está a media distancia. */
+    private void tickCharge() {
+        if (dashCooldown > 0) {
+            dashCooldown--;
+            return;
+        }
+        LivingEntity t = getTarget();
+        if (t == null || !onGround() || isCrawling() || getCarried() != null) {
+            return;
+        }
+        double d = distanceTo(t);
+        if (d < 6.0 || d > 16.0 || !hasLineOfSight(t)) {
+            return;
+        }
+        Vec3 dir = new Vec3(t.getX() - getX(), 0.0, t.getZ() - getZ()).normalize();
+        setDeltaMovement(dir.x * 1.0, 0.25, dir.z * 1.0);
+        this.hasImpulse = true;
+        dashCooldown = 140;
+        playSound(SoundEvents.ZOMBIE_VILLAGER_AMBIENT, 1.4F, 0.3F);
+    }
+
+    /** Aura de frío: ralentiza y congela poco a poco a jugadores y aldeanos cercanos. */
+    private void tickFrost(ServerLevel sl) {
+        if (tickCount % 10 != 0) {
+            return;
+        }
+        for (LivingEntity e : sl.getEntitiesOfClass(LivingEntity.class, getBoundingBox().inflate(9.0, 3.0, 9.0),
+                x -> x instanceof Player || x instanceof AbstractVillager)) {
+            if (e instanceof Player p && (p.isCreative() || p.isSpectator())) {
+                continue;
+            }
+            e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 0, false, false));
+            e.setTicksFrozen(Math.min(e.getTicksRequiredToFreeze() + 40, e.getTicksFrozen() + 12));
+        }
+        sl.sendParticles(ParticleTypes.SNOWFLAKE, getX(), getY() + 1.0, getZ(), 6, 1.2, 0.8, 1.2, 0.02);
+    }
+
+    private void tickFrenzy(ServerLevel sl) {
+        if (frenzyStacks <= 0) {
+            return;
+        }
+        if (--frenzyTimer <= 0) {
+            frenzyStacks--;
+            frenzyTimer = 60;
+            applyFrenzy();
+        }
+        if (frenzyStacks >= 3 && tickCount % 10 == 0) {
+            sl.sendParticles(ParticleTypes.ANGRY_VILLAGER, getX(), getY() + 2.0, getZ(), 1, 0.2, 0.1, 0.2, 0.0);
+        }
+    }
+
+    private void addFrenzy() {
+        if (frenzyStacks < 5) {
+            frenzyStacks++;
+        }
+        frenzyTimer = 160;
+        applyFrenzy();
+    }
+
+    private void applyFrenzy() {
+        AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed == null) {
+            return;
+        }
+        speed.removeModifier(FRENZY_ID);
+        if (frenzyStacks > 0) {
+            speed.addTransientModifier(new AttributeModifier(FRENZY_ID, "mimic frenzy",
+                    0.07D * frenzyStacks, AttributeModifier.Operation.MULTIPLY_BASE));
+        }
+    }
+
+    private void removeFrenzy() {
+        frenzyStacks = 0;
+        applyFrenzy();
+    }
+
+    private void onHitAbility(LivingEntity victim) {
+        switch (getVariant()) {
+            case V_ASH -> victim.setSecondsOnFire(5);
+            case V_BONE -> {
+                victim.setTicksFrozen(victim.getTicksRequiredToFreeze() + 60);
+                victim.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 1));
+            }
+            case V_MOSS -> victim.addEffect(new MobEffectInstance(MobEffects.POISON, 100, 0));
+            case V_FLAYED -> {
+                addFrenzy();
+                heal(2.0F);
+            }
+            default -> victim.knockback(0.8, getX() - victim.getX(), getZ() - victim.getZ());
+        }
+    }
+
+    /** Variante visual de la forma monstruosa; 0 mientras no se haya asignado. */
+    public int getVariant() {
+        return Math.max(0, Math.min(VARIANT_COUNT - 1, this.entityData.get(DATA_VARIANT)));
+    }
+
+    /** Factor de tamaño visual (0,92 a 1,1). Solo cosmético: no cambia la hitbox. */
+    public float getSizeScale() {
+        return this.entityData.get(DATA_SIZE) / 100.0F;
     }
 
     // ------------------------------------------------------------------ arrastrarse
@@ -252,6 +417,10 @@ public class MimicEntity extends Monster {
     }
 
     private void assignDisguise() {
+        if (this.entityData.get(DATA_VARIANT) < 0) {
+            this.entityData.set(DATA_VARIANT, random.nextInt(VARIANT_COUNT));
+            this.entityData.set(DATA_SIZE, 92 + random.nextInt(19));
+        }
         if (this.entityData.get(DATA_VTYPE).isEmpty()) {
             String type = "plains";
             try {
@@ -439,6 +608,7 @@ public class MimicEntity extends Monster {
 
         if (monster) {
             HideManager.mimicSense(this);
+            tickAbilities();
             if (tickCount % 80 == 0 && random.nextInt(3) == 0) {
                 playSound(SoundEvents.ZOMBIE_VILLAGER_AMBIENT, 1.0F, 0.4F);
             }
@@ -451,6 +621,7 @@ public class MimicEntity extends Monster {
 
     private void onFormChanged(boolean monster) {
         lastMonster = monster;
+        removeFrenzy();
         AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) {
             speed.removeModifier(NIGHT_SPEED_ID);
@@ -509,6 +680,9 @@ public class MimicEntity extends Monster {
         boolean ok = super.doHurtTarget(target);
         if (ok && target instanceof LivingEntity victim && level() instanceof ServerLevel sl) {
             LimbSystem.spawnBlood(sl, victim.position().add(0.0, victim.getBbHeight() * 0.6, 0.0), 10);
+            if (isMonsterForm()) {
+                onHitAbility(victim);
+            }
             boolean protectedPlayer = victim instanceof Player p && (p.isCreative() || p.isSpectator());
             if (isMonsterForm() && !protectedPlayer && victim.isAlive() && LimbSystem.canLoseLimbs(victim)
                     && ripCooldown <= 0 && random.nextFloat() < 0.35F) {
@@ -524,6 +698,10 @@ public class MimicEntity extends Monster {
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
+        if (getVariant() == V_ASH && isMonsterForm() && source.is(DamageTypeTags.IS_FIRE)) {
+            setRemainingFireTicks(0);
+            return false;
+        }
         Entity attacker = source.getEntity();
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && !(attacker instanceof Player)) {
             return false;
@@ -602,6 +780,8 @@ public class MimicEntity extends Monster {
         tag.putInt("Transform", getTransformTicks());
         tag.putString("VillagerType", this.entityData.get(DATA_VTYPE));
         tag.putString("Profession", this.entityData.get(DATA_PROFESSION));
+        tag.putInt("Variant", this.entityData.get(DATA_VARIANT));
+        tag.putInt("SizePct", this.entityData.get(DATA_SIZE));
         if (origin != null) {
             tag.put("Origin", NbtUtils.writeBlockPos(origin));
         }
@@ -613,6 +793,10 @@ public class MimicEntity extends Monster {
         setTransformTicks(tag.getInt("Transform"));
         this.entityData.set(DATA_VTYPE, tag.getString("VillagerType"));
         this.entityData.set(DATA_PROFESSION, tag.getString("Profession"));
+        if (tag.contains("Variant")) {
+            this.entityData.set(DATA_VARIANT, tag.getInt("Variant"));
+            this.entityData.set(DATA_SIZE, tag.getInt("SizePct"));
+        }
         if (tag.contains("Origin")) {
             origin = NbtUtils.readBlockPos(tag.getCompound("Origin"));
             if (!isMonsterForm()) {
