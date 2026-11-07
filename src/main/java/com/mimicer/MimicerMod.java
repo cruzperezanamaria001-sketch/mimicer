@@ -19,6 +19,8 @@ public class MimicerMod {
         ModEntities.ENTITIES.register(bus);
         com.mimicer.registry.ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
+        net.minecraftforge.fml.ModLoadingContext.get().registerConfig(
+                net.minecraftforge.fml.config.ModConfig.Type.COMMON, com.mimicer.config.GlitchConfig.SPEC);
         MinecraftForge.EVENT_BUS.register(this);
     }
 }

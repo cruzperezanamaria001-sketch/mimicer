@@ -2,15 +2,91 @@
   "aldeano_grito": {
     "subtitle": "subtitles.mimicer.aldeano_grito",
     "sounds": [
-      { "name": "mimicer:aldeano_grito", "volume": 1.0, "attenuation_distance": 48 },
-      { "name": "mimicer:aldeano_grito_2", "volume": 1.0, "attenuation_distance": 48 },
-      { "name": "mimicer:aldeano_grito_3", "volume": 1.0, "attenuation_distance": 48 }
+      {
+        "name": "mimicer:aldeano_grito",
+        "volume": 1.0,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "mimicer:aldeano_grito_2",
+        "volume": 1.0,
+        "attenuation_distance": 48
+      },
+      {
+        "name": "mimicer:aldeano_grito_3",
+        "volume": 1.0,
+        "attenuation_distance": 48
+      }
     ]
   },
   "void_warning": {
     "subtitle": "subtitles.mimicer.void_warning",
     "sounds": [
-      { "name": "mimicer:void_no_te_acerques", "volume": 1.0, "attenuation_distance": 40 }
+      {
+        "name": "mimicer:void_no_te_acerques",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
+    ]
+  },
+  "glitch_appear": {
+    "subtitle": "subtitles.mimicer.glitch_appear",
+    "sounds": [
+      {
+        "name": "mimicer:glitch_appear",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
+    ]
+  },
+  "glitch_jumpscare": {
+    "subtitle": "subtitles.mimicer.glitch_jumpscare",
+    "sounds": [
+      {
+        "name": "mimicer:glitch_jumpscare",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
+    ]
+  },
+  "glitch_corrupt": {
+    "subtitle": "subtitles.mimicer.glitch_corrupt",
+    "sounds": [
+      {
+        "name": "mimicer:glitch_corrupt",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
+    ]
+  },
+  "glitch_charge": {
+    "subtitle": "subtitles.mimicer.glitch_charge",
+    "sounds": [
+      {
+        "name": "mimicer:glitch_charge",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
+    ]
+  },
+  "glitch_beam": {
+    "subtitle": "subtitles.mimicer.glitch_beam",
+    "sounds": [
+      {
+        "name": "mimicer:glitch_beam",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
+    ]
+  },
+  "glitch_step": {
+    "subtitle": "subtitles.mimicer.glitch_step",
+    "sounds": [
+      {
+        "name": "mimicer:glitch_step",
+        "volume": 1.0,
+        "attenuation_distance": 40
+      }
     ]
   }
 }

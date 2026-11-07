@@ -25,6 +25,12 @@ public class ModEntities {
                     .clientTrackingRange(10)
                     .build("the_void"));
 
+    public static final RegistryObject<EntityType<com.mimicer.entity.GlitchEntity>> GLITCH = ENTITIES.register("the_glitch",
+            () -> EntityType.Builder.of(com.mimicer.entity.GlitchEntity::new, MobCategory.MONSTER)
+                    .sized(0.6F, 2.0F)
+                    .clientTrackingRange(10)
+                    .build("the_glitch"));
+
     public static final RegistryObject<EntityType<CorpseEntity>> CORPSE = ENTITIES.register("cuerpo",
             () -> EntityType.Builder.of(CorpseEntity::new, MobCategory.MISC)
                     .sized(1.4F, 0.4F)

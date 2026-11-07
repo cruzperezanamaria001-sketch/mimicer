@@ -7,5 +7,14 @@
   "item.mimicer.the_void_spawn_egg": "The Void Spawn Egg",
   "subtitles.mimicer.void_warning": "The Void whispers",
   "subtitles.mimicer.aldeano_grito": "Mimic screams",
-  "message.mimicer.hiding": "Hiding under the bed. Press Jump to get out."
+  "message.mimicer.hiding": "Hiding under the bed. Press Jump to get out.",
+  "entity.mimicer.the_glitch": "The Glitch",
+  "item.mimicer.the_glitch_spawn_egg": "The Glitch Spawn Egg",
+  "block.mimicer.glitch_block": "Glitch Block",
+  "subtitles.mimicer.glitch_appear": "The Glitch appears",
+  "subtitles.mimicer.glitch_jumpscare": "The Glitch screeches",
+  "subtitles.mimicer.glitch_corrupt": "Corruption",
+  "subtitles.mimicer.glitch_charge": "The Glitch charges",
+  "subtitles.mimicer.glitch_beam": "Purple beam",
+  "subtitles.mimicer.glitch_step": "The Glitch moves"
 }

@@ -21,4 +21,11 @@ public class ModBlocks {
                     .sound(SoundType.WOOD)
                     .noOcclusion()
                     .pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)));
+
+    public static final RegistryObject<Block> GLITCH_BLOCK = BLOCKS.register("glitch_block",
+            () -> new com.mimicer.block.GlitchBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_PURPLE)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.AMETHYST)
+                    .lightLevel(state -> 4)));
 }

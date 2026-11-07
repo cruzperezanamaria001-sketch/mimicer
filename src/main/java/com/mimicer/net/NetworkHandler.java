@@ -28,6 +28,8 @@ public final class NetworkHandler {
         int id = 0;
         CHANNEL.registerMessage(id++, HideStatePacket.class, HideStatePacket::encode,
                 HideStatePacket::decode, HideStatePacket::handle);
+        CHANNEL.registerMessage(id++, GlitchScarePacket.class, GlitchScarePacket::encode,
+                GlitchScarePacket::decode, GlitchScarePacket::handle);
         CHANNEL.registerMessage(id++, StopHidePacket.class, StopHidePacket::encode,
                 StopHidePacket::decode, StopHidePacket::handle);
     }
@@ -73,6 +75,29 @@ public final class NetworkHandler {
                     HideManager.stopHiding(player);
                 }
             });
+            ctx.get().setPacketHandled(true);
+        }
+    }
+
+    /** Servidor a cliente: distorsión de pantalla del jumpscare de The Glitch. */
+    public static class GlitchScarePacket {
+        private final int ticks;
+
+        public GlitchScarePacket(int ticks) {
+            this.ticks = ticks;
+        }
+
+        public static void encode(GlitchScarePacket msg, FriendlyByteBuf buf) {
+            buf.writeVarInt(msg.ticks);
+        }
+
+        public static GlitchScarePacket decode(FriendlyByteBuf buf) {
+            return new GlitchScarePacket(buf.readVarInt());
+        }
+
+        public static void handle(GlitchScarePacket msg, Supplier<NetworkEvent.Context> ctx) {
+            ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> com.mimicer.client.GlitchOverlay.start(msg.ticks)));
             ctx.get().setPacketHandled(true);
         }
     }

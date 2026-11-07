@@ -29,6 +29,13 @@ public class ModItems {
             () -> new net.minecraftforge.common.ForgeSpawnEggItem(ModEntities.VOID,
                     0x050505, 0xcc0000, new Item.Properties()));
 
+    public static final RegistryObject<Item> GLITCH_BLOCK = ITEMS.register("glitch_block",
+            () -> new BlockItem(ModBlocks.GLITCH_BLOCK.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> GLITCH_SPAWN_EGG = ITEMS.register("the_glitch_spawn_egg",
+            () -> new net.minecraftforge.common.ForgeSpawnEggItem(ModEntities.GLITCH,
+                    0x120018, 0xb400ff, new Item.Properties()));
+
     public static final RegistryObject<CreativeModeTab> TAB = TABS.register("the_mimic",
             () -> CreativeModeTab.builder()
                     .title(Component.literal("The Mimic"))
@@ -37,6 +44,8 @@ public class ModItems {
                         output.accept(BOARD.get());
                         output.accept(MIMIC_SPAWN_EGG.get());
                         output.accept(VOID_SPAWN_EGG.get());
+                        output.accept(GLITCH_SPAWN_EGG.get());
+                        output.accept(GLITCH_BLOCK.get());
                     })
                     .build());
 }
