@@ -3,11 +3,15 @@ package com.mimicer.hide;
 import com.mimicer.entity.MimicEntity;
 import com.mimicer.net.NetworkHandler;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.core.Direction;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
@@ -18,22 +22,26 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.PacketDistributor;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Estado de los jugadores escondidos bajo una cama. Es la única fuente de verdad en el servidor;
+ * Estado de jugadores y aldeanos escondidos bajo una cama. Es la única fuente de verdad en el servidor;
  * el cliente solo recibe un paquete para su propio jugador.
  */
 public final class HideManager {
     public static final float REVEAL_THRESHOLD = 100.0F;
+    /** Marca en el NBT del aldeano escondido, para limpiar restos si el mundo se recarga. */
+    public static final String TAG_VILLAGER_HIDDEN = "mimicer_hidden";
 
     private static final class HideData {
         final BlockPos bed;
         float suspicion;
         /** Mímicos que te vieron meterte bajo la cama: solo ellos pueden descubrirte o romper la cama. */
-        final java.util.Set<UUID> seenBy = new java.util.HashSet<>();
+        final Set<UUID> seenBy = new HashSet<>();
 
         HideData(BlockPos bed) {
             this.bed = bed;
@@ -41,6 +49,7 @@ public final class HideManager {
     }
 
     private static final Map<UUID, HideData> HIDDEN = new ConcurrentHashMap<>();
+    private static final Map<UUID, HideData> V_HIDDEN = new ConcurrentHashMap<>();
 
     private HideManager() {}
 
@@ -64,23 +73,17 @@ public final class HideManager {
         player.refreshDimensions();
     }
 
-    // ------------------------------------------------------------ servidor
+    // ------------------------------------------------------------ jugadores (servidor)
 
     public static void startHiding(ServerPlayer player, BlockPos bed) {
         HideData data = new HideData(bed);
-        // Quién lo vio esconderse: los que lo persiguen o tienen línea de visión justo ahora (antes de moverlo).
-        for (MimicEntity m : player.level().getEntitiesOfClass(MimicEntity.class,
-                player.getBoundingBox().inflate(32.0, 10.0, 32.0), x -> x.isAlive() && x.isMonsterForm())) {
-            if (m.getTarget() == player || m.hasLineOfSight(player)) {
-                data.seenBy.add(m.getUUID());
-            }
-        }
+        addWitnesses(data, player.level(), player);
         HIDDEN.put(player.getUUID(), data);
         player.setInvisible(true);
         player.setDeltaMovement(Vec3.ZERO);
         player.teleportTo(bed.getX() + 0.5, bed.getY() + 0.02, bed.getZ() + 0.5);
         player.refreshDimensions();
-        player.level().playSound(null, bed, SoundEvents.WOOL_PLACE, net.minecraft.sounds.SoundSource.PLAYERS, 0.6F, 0.7F);
+        player.level().playSound(null, bed, SoundEvents.WOOL_PLACE, SoundSource.PLAYERS, 0.6F, 0.7F);
         NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new NetworkHandler.HideStatePacket(true, bed));
         // Si lo vieron, van derechos a la cama; si no, solo un ruido mínimo.
@@ -122,9 +125,98 @@ public final class HideManager {
         }
     }
 
-    /** Llamado desde el Mímico en forma monstruosa: acumula sospecha si está cerca de una cama ocupada. */
+    public static void reveal(ServerPlayer player, MimicEntity mimic) {
+        stopHiding(player);
+        mimic.setTarget(player);
+        player.level().playSound(null, player.blockPosition(), SoundEvents.ZOMBIE_VILLAGER_AMBIENT,
+                SoundSource.HOSTILE, 1.5F, 0.3F);
+    }
+
+    public static void forget(UUID id) {
+        HIDDEN.remove(id);
+    }
+
+    // ------------------------------------------------------------ aldeanos (servidor)
+
+    public static boolean isVillagerHidden(Villager villager) {
+        return V_HIDDEN.containsKey(villager.getUUID());
+    }
+
+    public static BlockPos villagerBed(Villager villager) {
+        HideData data = V_HIDDEN.get(villager.getUUID());
+        return data == null ? null : data.bed;
+    }
+
+    /** Mete al aldeano bajo la cama: invisible, quieto y sin IA hasta que pase el peligro o lo descubran. */
+    public static boolean startHidingVillager(Villager villager, BlockPos bed) {
+        Level level = villager.level();
+        if (level.isClientSide || !(level.getBlockState(bed).getBlock() instanceof BedBlock)
+                || isBedTaken(level, bed) || isVillagerHidden(villager)) {
+            return false;
+        }
+        HideData data = new HideData(bed);
+        addWitnesses(data, level, villager);
+        V_HIDDEN.put(villager.getUUID(), data);
+        villager.getPersistentData().putBoolean(TAG_VILLAGER_HIDDEN, true);
+        villager.getNavigation().stop();
+        villager.setNoAi(true);
+        villager.setInvisible(true);
+        villager.setDeltaMovement(Vec3.ZERO);
+        villager.moveTo(bed.getX() + 0.5, bed.getY() + 0.02, bed.getZ() + 0.5, villager.getYRot(), 0.0F);
+        level.playSound(null, bed, SoundEvents.WOOL_PLACE, SoundSource.NEUTRAL, 0.6F, 0.8F);
+        NoiseManager.emit(level, villager.position(), data.seenBy.isEmpty() ? 4.0F : 40.0F);
+        return true;
+    }
+
+    /** Lo saca de debajo de la cama (peligro pasado, cama rota, herido o descubierto). */
+    public static void unhideVillager(Villager villager) {
+        V_HIDDEN.remove(villager.getUUID());
+        villager.getPersistentData().remove(TAG_VILLAGER_HIDDEN);
+        villager.setInvisible(false);
+        villager.setNoAi(false);
+    }
+
+    private static void revealVillager(Villager villager, MimicEntity mimic) {
+        unhideVillager(villager);
+        mimic.setTarget(villager);
+        villager.level().playSound(null, villager.blockPosition(), SoundEvents.VILLAGER_HURT,
+                SoundSource.NEUTRAL, 1.2F, 0.8F);
+    }
+
+    // ------------------------------------------------------------ comunes
+
+    /** Quién lo vio esconderse: los que lo persiguen o tienen línea de visión justo ahora (antes de moverlo). */
+    private static void addWitnesses(HideData data, Level level, net.minecraft.world.entity.LivingEntity hider) {
+        for (MimicEntity m : level.getEntitiesOfClass(MimicEntity.class,
+                hider.getBoundingBox().inflate(32.0, 10.0, 32.0), x -> x.isAlive() && x.isMonsterForm())) {
+            if (m.getTarget() == hider || m.hasLineOfSight(hider)) {
+                data.seenBy.add(m.getUUID());
+            }
+        }
+    }
+
+    /** ¿Ya hay alguien (jugador o aldeano) escondido bajo esta cama? */
+    public static boolean isBedTaken(Level level, BlockPos pos) {
+        BlockPos other = otherHalf(level, pos);
+        for (HideData d : HIDDEN.values()) {
+            if (d.bed.equals(pos) || d.bed.equals(other)) {
+                return true;
+            }
+        }
+        for (HideData d : V_HIDDEN.values()) {
+            if (d.bed.equals(pos) || d.bed.equals(other)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Llamado desde el Mímico en forma monstruosa: acumula sospecha sobre quien se escondió bajo una cama
+     * (jugador o aldeano), pero solo si él lo vio esconderse.
+     */
     public static void mimicSense(MimicEntity mimic) {
-        if (mimic.tickCount % 2 != 0 || HIDDEN.isEmpty()) {
+        if (mimic.tickCount % 2 != 0 || (HIDDEN.isEmpty() && V_HIDDEN.isEmpty())) {
             return;
         }
         for (Map.Entry<UUID, HideData> entry : HIDDEN.entrySet()) {
@@ -133,36 +225,74 @@ public final class HideManager {
                 continue;
             }
             HideData data = entry.getValue();
-            // Un Mímico que no te vio esconderte no sabe que estás ahí: ni te descubre ni rompe la cama.
-            if (!data.seenBy.contains(mimic.getUUID())) {
-                continue;
+            int result = sense(mimic, data, player.position());
+            if (result == 2) {
+                breakBed(mimic, data);
             }
-            // Solo cuenta si el Mímico está en la misma habitación que la cama: cerca de alguna de sus dos mitades
-            // y con una línea directa hasta ella. Estar al otro lado de una pared no sirve de nada.
-            BlockPos other = otherHalf(mimic.level(), data.bed);
-            double dist = Math.min(mimic.position().distanceTo(Vec3.atCenterOf(data.bed)),
-                    mimic.position().distanceTo(Vec3.atCenterOf(other)));
-            if (dist > 4.0 || !canSeeBed(mimic, data.bed, other)) {
-                continue;
-            }
-            boolean adjacent = dist < 2.2;
-            float add = adjacent ? 2.5F : 0.6F;
-            if (NoiseManager.recentNoiseNear(mimic.level(), player.position(), 8.0, 60)) {
-                add += adjacent ? 6.0F : 1.5F;
-            }
-            data.suspicion += add;
-            if (data.suspicion >= REVEAL_THRESHOLD) {
-                reveal(player, mimic);
-                return;
-            }
-            // Si sospecha pero no se acerca, rompe la cama para sacarlo.
-            if (!adjacent && data.suspicion >= REVEAL_THRESHOLD * 0.5F && mimic.getRandom().nextInt(20) == 0) {
-                mimic.swing(InteractionHand.MAIN_HAND);
-                mimic.level().destroyBlock(data.bed, true, mimic);
+            if (result != 0) {
                 reveal(player, mimic);
                 return;
             }
         }
+        if (!(mimic.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        for (Map.Entry<UUID, HideData> entry : V_HIDDEN.entrySet()) {
+            Entity e = serverLevel.getEntity(entry.getKey());
+            if (!(e instanceof Villager villager)) {
+                continue;
+            }
+            if (!villager.isAlive()) {
+                V_HIDDEN.remove(entry.getKey());
+                continue;
+            }
+            HideData data = entry.getValue();
+            int result = sense(mimic, data, villager.position());
+            if (result == 2) {
+                breakBed(mimic, data);
+            }
+            if (result != 0) {
+                revealVillager(villager, mimic);
+                return;
+            }
+        }
+    }
+
+    /**
+     * 0 = nada, 1 = lo descubre, 2 = rompe la cama para sacarlo.
+     * Un Mímico que no lo vio esconderse no sabe que está ahí.
+     */
+    private static int sense(MimicEntity mimic, HideData data, Vec3 victimPos) {
+        if (!data.seenBy.contains(mimic.getUUID())) {
+            return 0;
+        }
+        // Solo cuenta si el Mímico está en la misma habitación que la cama: cerca de alguna de sus dos mitades
+        // y con una línea directa hasta ella. Estar al otro lado de una pared no sirve de nada.
+        BlockPos other = otherHalf(mimic.level(), data.bed);
+        double dist = Math.min(mimic.position().distanceTo(Vec3.atCenterOf(data.bed)),
+                mimic.position().distanceTo(Vec3.atCenterOf(other)));
+        if (dist > 4.0 || !canSeeBed(mimic, data.bed, other)) {
+            return 0;
+        }
+        boolean adjacent = dist < 2.2;
+        float add = adjacent ? 2.5F : 0.6F;
+        if (NoiseManager.recentNoiseNear(mimic.level(), victimPos, 8.0, 60)) {
+            add += adjacent ? 6.0F : 1.5F;
+        }
+        data.suspicion += add;
+        if (data.suspicion >= REVEAL_THRESHOLD) {
+            return 1;
+        }
+        // Si sospecha pero no se acerca, rompe la cama para sacarlo.
+        if (!adjacent && data.suspicion >= REVEAL_THRESHOLD * 0.5F && mimic.getRandom().nextInt(20) == 0) {
+            return 2;
+        }
+        return 0;
+    }
+
+    private static void breakBed(MimicEntity mimic, HideData data) {
+        mimic.swing(InteractionHand.MAIN_HAND);
+        mimic.level().destroyBlock(data.bed, true, mimic);
     }
 
     /** La otra mitad de la cama (la cabecera o los pies), tanto si se pulsó una como la otra. */
@@ -187,16 +317,5 @@ public final class HideManager {
             }
         }
         return false;
-    }
-
-    public static void reveal(ServerPlayer player, MimicEntity mimic) {
-        stopHiding(player);
-        mimic.setTarget(player);
-        player.level().playSound(null, player.blockPosition(), SoundEvents.ZOMBIE_VILLAGER_AMBIENT,
-                net.minecraft.sounds.SoundSource.HOSTILE, 1.5F, 0.3F);
-    }
-
-    public static void forget(UUID id) {
-        HIDDEN.remove(id);
     }
 }

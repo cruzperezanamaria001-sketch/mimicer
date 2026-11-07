@@ -22,6 +22,9 @@ Mod de terror para Minecraft Java 1.20.1 (Forge 47.4.10, Java 17).
   puede levantar y lanzar.
 - **Aldeanos**: al ver algo raro alertan a los demás, corren a su cama, cierran puertas y colocan Tablas; la huida
   tiene tiempo y distancia máximos respecto a la aldea.
+- **Aldeanos escondidos**: tras atrincherarse, un aldeano alarmado se mete bajo su cama (invisible y quieto). El
+  Mímico lo descubre con las mismas reglas que a ti: solo si lo vio esconderse, y estando pegado a la cama o
+  rompiéndola. Sale solo cuando pasa el peligro, si le hieren o si rompen la cama. Una cama solo aloja a uno.
 - **Tabla**: bloque fino disponible en el inventario creativo (pestaña *The Mimic*) y por receta (3 tablones → 6 tablas).
 - **Esconderse**: agacharse + clic derecho en una cama. Saltar para salir. Solo te busca el Mímico que te vio
   esconderte (si no te vio, puede revisar la casa pero nunca te descubre). Te descubre si está

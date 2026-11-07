@@ -109,7 +109,7 @@ public final class GameEvents {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS);
             if (!level.isClientSide && player instanceof ServerPlayer sp && !state.getValue(BedBlock.OCCUPIED)
-                    && !sp.isSpectator()) {
+                    && !sp.isSpectator() && !HideManager.isBedTaken(level, event.getPos())) {
                 HideManager.startHiding(sp, event.getPos());
             }
             return;

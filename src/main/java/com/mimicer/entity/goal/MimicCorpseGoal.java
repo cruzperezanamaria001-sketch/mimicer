@@ -6,6 +6,7 @@ import com.mimicer.hide.HideManager;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.npc.AbstractVillager;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
@@ -173,7 +174,9 @@ public class MimicCorpseGoal extends Goal {
         }
         List<AbstractVillager> villagers = mimic.level().getEntitiesOfClass(AbstractVillager.class,
                 mimic.getBoundingBox().inflate(24.0, 6.0, 24.0));
-        return villagers.stream().min(Comparator.comparingDouble(mimic::distanceToSqr)).orElse(null);
+        return villagers.stream()
+                .filter(v -> !(v instanceof Villager vv && HideManager.isVillagerHidden(vv)))
+                .min(Comparator.comparingDouble(mimic::distanceToSqr)).orElse(null);
     }
 
     private CorpseEntity findCorpse() {

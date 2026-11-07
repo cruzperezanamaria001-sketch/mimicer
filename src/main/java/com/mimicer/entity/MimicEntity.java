@@ -470,7 +470,8 @@ public class MimicEntity extends Monster {
             return !HideManager.isHidden(player) && hasLineOfSight(player);
         }
         if (e instanceof AbstractVillager) {
-            return true;
+            // Un aldeano escondido bajo una cama no es presa hasta que lo descubran.
+            return !(e instanceof Villager v && HideManager.isVillagerHidden(v));
         }
         return e instanceof Animal && hasLineOfSight(e);
     }

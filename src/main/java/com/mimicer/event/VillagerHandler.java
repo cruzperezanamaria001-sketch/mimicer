@@ -3,6 +3,7 @@ package com.mimicer.event;
 import com.mimicer.MimicerMod;
 import com.mimicer.block.BoardBlock;
 import com.mimicer.entity.MimicEntity;
+import com.mimicer.hide.HideManager;
 import com.mimicer.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -72,6 +73,15 @@ public final class VillagerHandler {
         long now = level.getGameTime();
 
         detectMimic(level, villager, now);
+
+        if (HideManager.isVillagerHidden(villager)) {
+            tickHiddenVillager(level, villager, data, now);
+            return;
+        }
+        if (data.getBoolean(HideManager.TAG_VILLAGER_HIDDEN)) {
+            // Resto de una partida anterior: el estado en memoria se perdió y seguiría invisible y sin IA.
+            HideManager.unhideVillager(villager);
+        }
 
         boolean alarmed = now < data.getLong(TAG_ALARM);
         Brain<Villager> brain = villager.getBrain();
@@ -157,6 +167,25 @@ public final class VillagerHandler {
         }
     }
 
+    // ------------------------------------------------------------ escondido bajo la cama
+
+    /** Mientras está escondido: quieto bajo la cama hasta que pase el peligro, rompan la cama o lo hieran. */
+    private static void tickHiddenVillager(ServerLevel level, Villager villager, CompoundTag data, long now) {
+        BlockPos bed = HideManager.villagerBed(villager);
+        boolean bedOk = bed != null && level.getBlockState(bed).getBlock() instanceof BedBlock;
+        boolean calm = now - data.getLong(TAG_THREAT) > CALM_TICKS;
+        if (!bedOk || calm || villager.hurtTime > 0) {
+            HideManager.unhideVillager(villager);
+            return;
+        }
+        double bx = bed.getX() + 0.5;
+        double by = bed.getY() + 0.02;
+        double bz = bed.getZ() + 0.5;
+        if (villager.distanceToSqr(bx, by, bz) > 0.25) {
+            villager.moveTo(bx, by, bz, villager.getYRot(), 0.0F);
+        }
+    }
+
     // ------------------------------------------------------------ refugio y barricadas
 
     private static void seekShelter(ServerLevel level, Villager villager, Brain<Villager> brain,
@@ -187,6 +216,11 @@ public final class VillagerHandler {
             if (placeBoard(level, villager)) {
                 data.putInt(TAG_BOARDS, data.getInt(TAG_BOARDS) + 1);
             }
+        }
+        // Tras atrincherarse (o si no hay nada que tapiar) se mete bajo su cama, si no la ocupa ya alguien.
+        if (recentThreat && level.getBlockState(shelter).getBlock() instanceof BedBlock
+                && (data.getInt(TAG_BOARDS) >= 2 || villager.getRandom().nextFloat() < 0.15F)) {
+            HideManager.startHidingVillager(villager, shelter);
         }
     }
 
