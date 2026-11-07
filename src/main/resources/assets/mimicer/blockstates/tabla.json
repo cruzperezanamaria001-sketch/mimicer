@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "mimicer:block/tabla" },
+    "facing=east": { "model": "mimicer:block/tabla", "y": 90 },
+    "facing=south": { "model": "mimicer:block/tabla", "y": 180 },
+    "facing=west": { "model": "mimicer:block/tabla", "y": 270 }
+  }
+}

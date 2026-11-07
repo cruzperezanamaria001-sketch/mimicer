@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "###"
+  ],
+  "key": {
+    "#": { "tag": "minecraft:planks" }
+  },
+  "result": { "item": "mimicer:tabla", "count": 6 }
+}

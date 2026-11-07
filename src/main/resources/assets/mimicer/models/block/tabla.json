@@ -1,0 +1,20 @@
+{
+  "textures": {
+    "particle": "mimicer:block/tabla",
+    "tabla": "mimicer:block/tabla"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 13],
+      "to": [16, 16, 16],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 16], "texture": "#tabla" },
+        "south": { "uv": [0, 0, 16, 16], "texture": "#tabla" },
+        "east": { "uv": [13, 0, 16, 16], "texture": "#tabla" },
+        "west": { "uv": [0, 0, 3, 16], "texture": "#tabla" },
+        "up": { "uv": [0, 13, 16, 16], "texture": "#tabla" },
+        "down": { "uv": [0, 0, 16, 3], "texture": "#tabla" }
+      }
+    }
+  ]
+}

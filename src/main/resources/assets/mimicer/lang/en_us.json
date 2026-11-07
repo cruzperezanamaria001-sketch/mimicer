@@ -1,0 +1,7 @@
+{
+  "block.mimicer.tabla": "Board",
+  "item.mimicer.mimico_spawn_egg": "Mimic Spawn Egg",
+  "entity.mimicer.mimico": "Mimic",
+  "entity.mimicer.cuerpo": "Body",
+  "message.mimicer.hiding": "Hiding under the bed. Press Jump to get out."
+}
