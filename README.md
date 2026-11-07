@@ -56,3 +56,15 @@ Limitaciones (sin probar en el juego): los golems de hierro sí pueden atacarlo;
 - Animaciones GeckoLib: aparición, idle, observación, giro de cabeza, jumpscare, caminata, persecución, corrupción, rotura, carga, disparo y muerte.
 
 Limitaciones: compila en Actions, pero no se ha probado en el juego; el modelo y las animaciones están escritos a mano y pueden necesitar ajustes.
+
+## Dynamic Blood System
+
+- **Manchas = bloques finos** (`blood_stain`): sin entidades, sincronizados con todos los jugadores, sin colisión ni selección. Se pegan a suelos, paredes, techos, puertas, trampillas, vallas, barrotes y cristales. Se oscurecen en 3 fases y desaparecen solas.
+- **Salpicaduras direccionales:** cada golpe lanza rayos desde el impacto en la dirección del ataque (proyectil, atacante o explosión) con dispersión aleatoria; la cantidad depende del daño. Hay 6 texturas (charco, mancha, chorro, gotas, arrastre) con rotación aleatoria. Las grandes se extienden o gotean por la pared.
+- **Heridas:** los golpes y las extremidades perdidas generan una herida que decae sola; los heridos sueltan gotas, y huyendo dejan un rastro más denso cuanto menos vida y más grave la herida.
+- **Muerte y cadáveres:** charco y salpicaduras horizontales que manchan paredes cercanas; los cadáveres con extremidades perdidas siguen manando un rato.
+- **Mutilaciones:** cabeza (chorro hacia arriba), brazos (abanico lateral), piernas (bajo y gran charco). El mismo sistema se aplica al Mímico y a The Void. `BloodSystem.heavyHit(...)` queda preparado para The Reaper, que aún no existe.
+- **No sangran:** The Glitch, The Void, golems, esqueletos, slimes ni blazes; tampoco hay manchas por fuego, ahogamiento o hambre.
+- **Configuración** (`mimicer-blood.toml`): duración, intensidad, manchas máximas por minuto y por golpe, partículas por tick, rastros, frecuencia, extensión, charcos y cadáveres.
+
+No se usa GeckoLib aquí: las manchas son bloques y las salpicaduras, partículas estándar. Compila en Actions, no probado en el juego.
