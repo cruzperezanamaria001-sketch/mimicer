@@ -32,6 +32,8 @@ public final class HideManager {
     private static final class HideData {
         final BlockPos bed;
         float suspicion;
+        /** Mímicos que te vieron meterte bajo la cama: solo ellos pueden descubrirte o romper la cama. */
+        final java.util.Set<UUID> seenBy = new java.util.HashSet<>();
 
         HideData(BlockPos bed) {
             this.bed = bed;
@@ -65,7 +67,15 @@ public final class HideManager {
     // ------------------------------------------------------------ servidor
 
     public static void startHiding(ServerPlayer player, BlockPos bed) {
-        HIDDEN.put(player.getUUID(), new HideData(bed));
+        HideData data = new HideData(bed);
+        // Quién lo vio esconderse: los que lo persiguen o tienen línea de visión justo ahora (antes de moverlo).
+        for (MimicEntity m : player.level().getEntitiesOfClass(MimicEntity.class,
+                player.getBoundingBox().inflate(32.0, 10.0, 32.0), x -> x.isAlive() && x.isMonsterForm())) {
+            if (m.getTarget() == player || m.hasLineOfSight(player)) {
+                data.seenBy.add(m.getUUID());
+            }
+        }
+        HIDDEN.put(player.getUUID(), data);
         player.setInvisible(true);
         player.setDeltaMovement(Vec3.ZERO);
         player.teleportTo(bed.getX() + 0.5, bed.getY() + 0.02, bed.getZ() + 0.5);
@@ -73,7 +83,8 @@ public final class HideManager {
         player.level().playSound(null, bed, SoundEvents.WOOL_PLACE, net.minecraft.sounds.SoundSource.PLAYERS, 0.6F, 0.7F);
         NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new NetworkHandler.HideStatePacket(true, bed));
-        NoiseManager.emit(player.level(), player.position(), 5.0F);
+        // Si lo vieron, van derechos a la cama; si no, solo un ruido mínimo.
+        NoiseManager.emit(player.level(), player.position(), data.seenBy.isEmpty() ? 5.0F : 40.0F);
     }
 
     public static void stopHiding(ServerPlayer player) {
@@ -122,6 +133,10 @@ public final class HideManager {
                 continue;
             }
             HideData data = entry.getValue();
+            // Un Mímico que no te vio esconderte no sabe que estás ahí: ni te descubre ni rompe la cama.
+            if (!data.seenBy.contains(mimic.getUUID())) {
+                continue;
+            }
             // Solo cuenta si el Mímico está en la misma habitación que la cama: cerca de alguna de sus dos mitades
             // y con una línea directa hasta ella. Estar al otro lado de una pared no sirve de nada.
             BlockPos other = otherHalf(mimic.level(), data.bed);
