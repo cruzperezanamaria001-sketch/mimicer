@@ -51,7 +51,53 @@ public final class HideManager {
     private static final Map<UUID, HideData> HIDDEN = new ConcurrentHashMap<>();
     private static final Map<UUID, HideData> V_HIDDEN = new ConcurrentHashMap<>();
 
+    /** Víctimas que un monstruo está sacando de la cama ahora mismo: víctima -> monstruo. */
+    private static final Map<UUID, UUID> EXTRACTING = new ConcurrentHashMap<>();
+
+    public record Hidden(net.minecraft.world.entity.LivingEntity victim, BlockPos bed) {}
+
     private HideManager() {}
+
+    public static boolean claimExtraction(UUID victim, UUID monster) {
+        return EXTRACTING.putIfAbsent(victim, monster) == null;
+    }
+
+    public static void releaseExtraction(UUID victim, UUID monster) {
+        EXTRACTING.remove(victim, monster);
+    }
+
+    public static boolean isExtracting(UUID victim) {
+        return EXTRACTING.containsKey(victim);
+    }
+
+    public static boolean isHiddenVictim(net.minecraft.world.entity.LivingEntity e) {
+        if (e instanceof Player p) {
+            return isHidden(p);
+        }
+        return e instanceof Villager v && isVillagerHidden(v);
+    }
+
+    /** Escondido bajo una cama, visto por este monstruo y no reservado por otro. */
+    public static Hidden findSeenBy(ServerLevel level, UUID monster, Vec3 pos, double range) {
+        if (HIDDEN.isEmpty() && V_HIDDEN.isEmpty()) {
+            return null;
+        }
+        for (Map.Entry<UUID, HideData> entry : HIDDEN.entrySet()) {
+            Player p = level.getPlayerByUUID(entry.getKey());
+            if (p != null && entry.getValue().seenBy.contains(monster) && !EXTRACTING.containsKey(entry.getKey())
+                    && p.position().distanceToSqr(pos) < range * range) {
+                return new Hidden(p, entry.getValue().bed);
+            }
+        }
+        for (Map.Entry<UUID, HideData> entry : V_HIDDEN.entrySet()) {
+            Entity e = level.getEntity(entry.getKey());
+            if (e instanceof Villager v && v.isAlive() && entry.getValue().seenBy.contains(monster)
+                    && !EXTRACTING.containsKey(entry.getKey()) && v.position().distanceToSqr(pos) < range * range) {
+                return new Hidden(v, entry.getValue().bed);
+            }
+        }
+        return null;
+    }
 
     public static boolean isHidden(Player player) {
         return HIDDEN.containsKey(player.getUUID());
@@ -115,7 +161,7 @@ public final class HideManager {
         double by = data.bed.getY() + 0.02;
         double bz = data.bed.getZ() + 0.5;
         // Solo recoloca si algo lo movió: teleportar cada tick provoca tirones en el cliente.
-        if (player.distanceToSqr(bx, by, bz) > 0.09) {
+        if (!EXTRACTING.containsKey(player.getUUID()) && player.distanceToSqr(bx, by, bz) > 0.09) {
             player.teleportTo(bx, by, bz);
         }
         data.suspicion = Math.max(0.0F, data.suspicion - 0.05F);
@@ -178,7 +224,7 @@ public final class HideManager {
         villager.setNoAi(false);
     }
 
-    private static void revealVillager(Villager villager, MimicEntity mimic) {
+    public static void revealVillager(Villager villager, MimicEntity mimic) {
         unhideVillager(villager);
         mimic.setTarget(villager);
         villager.level().playSound(null, villager.blockPosition(), SoundEvents.VILLAGER_HURT,
@@ -189,6 +235,12 @@ public final class HideManager {
 
     /** Quién lo vio esconderse: los que lo persiguen o tienen línea de visión justo ahora (antes de moverlo). */
     private static void addWitnesses(HideData data, Level level, net.minecraft.world.entity.LivingEntity hider) {
+        for (com.mimicer.entity.VoidEntity v : level.getEntitiesOfClass(com.mimicer.entity.VoidEntity.class,
+                hider.getBoundingBox().inflate(32.0, 10.0, 32.0), x -> x.isAlive())) {
+            if (v.getTarget() == hider || v.hasLineOfSight(hider)) {
+                data.seenBy.add(v.getUUID());
+            }
+        }
         for (MimicEntity m : level.getEntitiesOfClass(MimicEntity.class,
                 hider.getBoundingBox().inflate(32.0, 10.0, 32.0), x -> x.isAlive() && x.isMonsterForm())) {
             if (m.getTarget() == hider || m.hasLineOfSight(hider)) {
@@ -218,7 +270,8 @@ public final class HideManager {
      * (jugador o aldeano), pero solo si él lo vio esconderse.
      */
     public static void mimicSense(MimicEntity mimic) {
-        if (mimic.tickCount % 2 != 0 || (HIDDEN.isEmpty() && V_HIDDEN.isEmpty())) {
+        if (mimic.tickCount % 2 != 0 || (HIDDEN.isEmpty() && V_HIDDEN.isEmpty())
+                || (mimic.isBusyWithScene() && !isExtractingBy(mimic))) {
             return;
         }
         for (Map.Entry<UUID, HideData> entry : HIDDEN.entrySet()) {
@@ -230,9 +283,13 @@ public final class HideManager {
             int result = sense(mimic, data, player.position());
             if (result == 2) {
                 breakBed(mimic, data);
-            }
-            if (result != 0) {
                 reveal(player, mimic);
+                return;
+            }
+            if (result == 1) {
+                if (!mimic.requestExtraction(player, data.bed)) {
+                    reveal(player, mimic);
+                }
                 return;
             }
         }
@@ -252,9 +309,13 @@ public final class HideManager {
             int result = sense(mimic, data, villager.position());
             if (result == 2) {
                 breakBed(mimic, data);
-            }
-            if (result != 0) {
                 revealVillager(villager, mimic);
+                return;
+            }
+            if (result == 1) {
+                if (!mimic.requestExtraction(villager, data.bed)) {
+                    revealVillager(villager, mimic);
+                }
                 return;
             }
         }
@@ -264,6 +325,10 @@ public final class HideManager {
      * 0 = nada, 1 = lo descubre, 2 = rompe la cama para sacarlo.
      * Un Mímico que no lo vio esconderse no sabe que está ahí.
      */
+    private static boolean isExtractingBy(MimicEntity mimic) {
+        return EXTRACTING.containsValue(mimic.getUUID());
+    }
+
     private static int sense(MimicEntity mimic, HideData data, Vec3 victimPos) {
         if (!data.seenBy.contains(mimic.getUUID())) {
             return 0;
@@ -298,6 +363,10 @@ public final class HideManager {
     }
 
     /** La otra mitad de la cama (la cabecera o los pies), tanto si se pulsó una como la otra. */
+    public static BlockPos otherBedHalf(Level level, BlockPos pos) {
+        return otherHalf(level, pos);
+    }
+
     private static BlockPos otherHalf(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BedBlock)) {

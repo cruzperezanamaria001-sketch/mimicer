@@ -327,6 +327,16 @@ public final class BloodSystem {
         spray(level, low, new Vec3(0.0, 1.0, 0.0), 10, 0.3);
     }
 
+    /** Mordisco de un monstruo sobre un cadáver: pequeño charco y salpicadura hacia arriba y los lados. */
+    public static void biteBurst(ServerLevel level, Vec3 pos, Entity ctx) {
+        if (!BloodConfig.ENABLED.get()) return;
+        double mult = BloodConfig.INTENSITY.get();
+        Vec3 origin = pos.add(0.0, 0.35, 0.0);
+        splatter(level, ctx, origin, new Vec3(0.0, 1.0, 0.0), Math.max(3, (int) Math.round(6 * mult)), 0.9, 2.4, false);
+        pool(level, pos, 0.9 + 0.3 * mult, 4, ctx);
+        spray(level, origin, new Vec3(0.0, 1.0, 0.0), 6, 0.25);
+    }
+
     private static void hitSplash(ServerLevel level, LivingEntity victim, Vec3 origin, Vec3 dir, double intensity) {
         int rays = Mth.clamp((int) Math.round(2 + intensity * 3), 2, 16);
         int forward = Math.max(1, (int) (rays * 0.7));

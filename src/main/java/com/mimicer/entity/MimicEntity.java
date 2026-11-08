@@ -56,7 +56,7 @@ import java.util.UUID;
 /**
  * El Mímico: de día es indistinguible de un aldeano; de noche se transforma en un monstruo.
  */
-public class MimicEntity extends Monster {
+public class MimicEntity extends Monster implements com.mimicer.entity.scene.SceneHost {
     public static final int TRANSFORM_TICKS = 40;
 
     private static final UUID NIGHT_SPEED_ID = UUID.fromString("5f6a0f4e-3a52-4c55-8d2c-6d1a1b0a7e11");
@@ -80,6 +80,10 @@ public class MimicEntity extends Monster {
     private static final EntityDataAccessor<Integer> DATA_SIZE =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
     public static final int VARIANT_COUNT = 5;
+    private static final EntityDataAccessor<Integer> DATA_FEED_START =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_EXTRACT_START =
+            SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_CRAWL =
             SynchedEntityData.defineId(MimicEntity.class, EntityDataSerializers.BOOLEAN);
     /** Tipo de aldeano (bioma) y profesión que imita; vacío hasta que se asigna en el servidor. */
@@ -97,6 +101,9 @@ public class MimicEntity extends Monster {
     private float crawlProgress;
     private float crawlProgressO;
     private int crawlTicks;
+    private boolean scenePosture;
+    private com.mimicer.entity.scene.FeedGoal feedGoal;
+    private com.mimicer.entity.scene.BedExtractionGoal extractGoal;
     private int crawlCooldown;
     private int noPathTicks;
     private double holeFloorY = Double.NaN;
@@ -140,6 +147,8 @@ public class MimicEntity extends Monster {
         this.entityData.define(DATA_VTYPE, "");
         this.entityData.define(DATA_PROFESSION, "");
         this.entityData.define(DATA_CRAWL, false);
+        this.entityData.define(DATA_FEED_START, -1);
+        this.entityData.define(DATA_EXTRACT_START, -1);
         this.entityData.define(DATA_VARIANT, -1);
         this.entityData.define(DATA_SIZE, 100);
     }
@@ -348,6 +357,10 @@ public class MimicEntity extends Monster {
             setCrawling(false);
             return;
         }
+        if (scenePosture) {
+            setCrawling(true);       // agachado durante la comida y la extracción
+            return;
+        }
         if (tickCount % 5 != 0) {
             return;
         }
@@ -440,6 +453,10 @@ public class MimicEntity extends Monster {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.feedGoal = new com.mimicer.entity.scene.FeedGoal(this);
+        this.extractGoal = new com.mimicer.entity.scene.BedExtractionGoal(this, com.mimicer.entity.scene.SceneTiming.Kind.MIMIC);
+        this.goalSelector.addGoal(0, this.extractGoal);
+        this.goalSelector.addGoal(0, this.feedGoal);
         this.goalSelector.addGoal(1, new MimicCorpseGoal(this));
         this.goalSelector.addGoal(2, new MimicBreakBlocksGoal(this));
         this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.2D, false));
@@ -475,6 +492,77 @@ public class MimicEntity extends Monster {
             return !(e instanceof Villager v && HideManager.isVillagerHidden(v));
         }
         return e instanceof Animal && hasLineOfSight(e);
+    }
+
+    // ------------------------------------------------------------------ escenas (comida / extracción)
+
+    @Override
+    public net.minecraft.world.entity.PathfinderMob mob() {
+        return this;
+    }
+
+    @Override
+    public int getFeedStart() {
+        return this.entityData.get(DATA_FEED_START);
+    }
+
+    @Override
+    public void setFeedStart(int t) {
+        this.entityData.set(DATA_FEED_START, t);
+    }
+
+    @Override
+    public int getExtractStart() {
+        return this.entityData.get(DATA_EXTRACT_START);
+    }
+
+    @Override
+    public void setExtractStart(int t) {
+        this.entityData.set(DATA_EXTRACT_START, t);
+    }
+
+    @Override
+    public void scenePosture(boolean crouched) {
+        this.scenePosture = crouched;
+        if (!crouched && isCrawling() && canStandUp()) {
+            setCrawling(false);
+        }
+    }
+
+    @Override
+    public boolean sceneAllowed() {
+        return isMonsterForm() && !isTransforming();
+    }
+
+    @Override
+    public void beginFeeding(CorpseEntity corpse) {
+        if (sceneAllowed() && feedGoal != null && !feedGoal.isActive()) {
+            feedGoal.assign(corpse);
+        }
+    }
+
+    @Override
+    public boolean requestExtraction(LivingEntity victim, @Nullable BlockPos bed) {
+        return bed != null && extractGoal != null && extractGoal.request(victim, bed);
+    }
+
+    @Override
+    public void onExtracted(LivingEntity victim) {
+        setTarget(victim);
+    }
+
+    @Override
+    public void onExtractFailed(LivingEntity victim) {
+        if (victim instanceof net.minecraft.server.level.ServerPlayer sp && HideManager.isHidden(sp)) {
+            HideManager.reveal(sp, this);
+        } else if (victim instanceof Villager v && HideManager.isVillagerHidden(v)) {
+            HideManager.revealVillager(v, this);
+        }
+    }
+
+    @Override
+    public boolean isBusyWithScene() {
+        return (feedGoal != null && feedGoal.isActive()) || (extractGoal != null && extractGoal.isActive());
     }
 
     // ------------------------------------------------------------------ estado
@@ -610,7 +698,9 @@ public class MimicEntity extends Monster {
 
         if (monster) {
             HideManager.mimicSense(this);
-            tickAbilities();
+            if (!isBusyWithScene()) {
+                tickAbilities();
+            }
             if (tickCount % 80 == 0 && random.nextInt(3) == 0) {
                 playSound(SoundEvents.ZOMBIE_VILLAGER_AMBIENT, 1.0F, 0.4F);
             }

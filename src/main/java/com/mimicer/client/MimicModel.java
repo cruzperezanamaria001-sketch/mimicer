@@ -30,6 +30,7 @@ public class MimicModel extends EntityModel<MimicEntity> {
     private final ModelPart root;
     private final ModelPart head;
     private final ModelPart nose;
+    private final ModelPart jaw;
     private final ModelPart body;
     private final ModelPart jacket;
     private final ModelPart armsCross;
@@ -42,6 +43,7 @@ public class MimicModel extends EntityModel<MimicEntity> {
         this.root = root;
         this.head = root.getChild("head");
         this.nose = head.getChild("nose");
+        this.jaw = head.getChild("jaw");
         this.body = root.getChild("body");
         this.jacket = body.getChild("jacket");
         this.armsCross = root.getChild("arms_cross");
@@ -61,6 +63,11 @@ public class MimicModel extends EntityModel<MimicEntity> {
         head.addOrReplaceChild("nose",
                 CubeListBuilder.create().texOffs(24, 0).addBox(-1.0F, -1.0F, -6.0F, 2.0F, 4.0F, 2.0F),
                 PartPose.offset(0.0F, -2.0F, 0.0F));
+
+        head.addOrReplaceChild("jaw",
+                CubeListBuilder.create().texOffs(0, 0)
+                        .addBox(-3.0F, -2.0F, -7.0F, 6.0F, 2.0F, 7.0F, new CubeDeformation(0.05F)),
+                PartPose.offset(0.0F, 0.0F, 3.0F));
 
         PartDefinition body = root.addOrReplaceChild("body",
                 CubeListBuilder.create().texOffs(16, 20).addBox(-4.0F, 0.0F, -3.0F, 8.0F, 12.0F, 6.0F),
@@ -199,7 +206,50 @@ public class MimicModel extends EntityModel<MimicEntity> {
         rightArm.zRot = 0.12F * m;
         leftArm.zRot = -0.12F * m;
 
+        jaw.xRot = 0.0F;
         applyCrawlPose(mimic, partial, swing, limbSwingAmount, headPitch);
+        applyScenes(mimic, ageInTicks - (float) Math.floor(ageInTicks), ageInTicks);
+    }
+
+    /** Alimentación y extracción de camas: sobre la pose a cuatro patas, cabeza, mandíbula y brazos. */
+    private void applyScenes(MimicEntity mimic, float partial, float age) {
+        float ft = mimic.feedTime(partial);
+        if (ft >= 0.0F) {
+            ScenePose.Feed f = ScenePose.feed(ft);
+            head.xRot += f.down() * 0.75F - f.pull() * 0.25F + f.chew() * 0.05F;
+            head.y += f.down() * 1.5F;
+            head.zRot = f.pull() * Mth.sin(age * 1.9F) * 0.3F + f.chew() * 0.08F;
+            jaw.xRot = f.jaw() * 0.95F + Math.max(0.0F, f.chew()) * 0.35F;
+            // Brazos: se clavan en el cuerpo y tiran de él, alternando.
+            float dig = f.reach() * 0.9F - f.pull() * 0.6F;
+            rightArm.xRot -= dig;
+            leftArm.xRot -= dig * 0.6F;
+            rightArm.zRot += f.pull() * 0.25F;
+            leftArm.zRot -= f.pull() * 0.25F;
+            body.xRot += f.down() * 0.06F + f.chew() * 0.02F;
+        }
+        float et = mimic.extractTime(partial);
+        if (et >= 0.0F) {
+            ScenePose.Extract x = ScenePose.extract(et, com.mimicer.entity.scene.SceneTiming.Kind.MIMIC);
+            // Asoma la cabeza ladeada para mirar bajo la cama y barre con el brazo derecho, muy estirado.
+            head.xRot += 0.55F * x.search() * (1.0F - x.grab());
+            head.zRot = 0.45F * x.search() * (1.0F - x.grab() * 0.6F);
+            jaw.xRot = 0.25F + 0.2F * Mth.sin(age * 0.5F);
+            if (x.grab() < 0.5F) {
+                rightArm.xRot -= 1.1F * x.search();
+                rightArm.zRot += Mth.sin(et * 0.45F) * 0.5F * x.search();
+                rightArm.yScale = Math.max(rightArm.yScale, 2.1F);
+            } else {
+                // Agarra y tira a tirones, echando el cuerpo hacia atrás.
+                float ratchet = (float) (x.drag() * 4.0F - Math.floor(x.drag() * 4.0F));
+                rightArm.xRot -= 1.1F - 0.9F * ratchet;
+                rightArm.yScale = Math.max(rightArm.yScale, 2.1F);
+                leftArm.xRot -= 0.5F * x.rock();
+                body.xRot -= 0.25F * x.drag() + 0.05F * x.rock();
+                head.zRot += 0.05F * x.rock();
+                jaw.xRot = 0.6F + 0.3F * Mth.sin(age * 1.4F);
+            }
+        }
     }
 
     /**

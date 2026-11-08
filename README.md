@@ -68,3 +68,10 @@ Limitaciones: compila en Actions, pero no se ha probado en el juego; el modelo y
 - **Configuración** (`mimicer-blood.toml`): duración, intensidad, manchas máximas por minuto y por golpe, partículas por tick, rastros, frecuencia, extensión, charcos y cadáveres.
 
 No se usa GeckoLib aquí: las manchas son bloques y las salpicaduras, partículas estándar. Compila en Actions, no probado en el juego.
+
+## Alimentación y extracción de camas (The Mimic y The Void)
+
+- **Alimentación**: tras matar a un jugador, aldeano o animal, el Mímico y The Void se acercan al cadáver, se agachan y lo devoran por tandas (brazos, piernas y al final la cabeza). Cada mordisco hace desaparecer una parte del cadáver con la máscara de mutilación existente y salpica sangre. Si les hacen daño, interrumpen la comida. The Glitch queda excluido.
+- **Extracción**: si ven a alguien escondido bajo una cama, caminan hasta un lado de la cama, se agachan, rebuscan con el brazo, lo agarran y lo arrastran sin teletransporte; después empieza el ataque. Cada monstruo tiene su propia animación. Una víctima solo la puede reservar un monstruo a la vez.
+- Mímico y Void siguen con sus modelos propios (animación procedimental); GeckoLib 4.8.4 se usa en The Glitch.
+- Compila en Actions; no probado en el juego.

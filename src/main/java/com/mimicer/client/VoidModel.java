@@ -158,6 +158,47 @@ public class VoidModel extends EntityModel<VoidEntity> {
         }
         legL.zRot = -0.04F;
         legR.zRot = 0.04F;
+        applyScenes(e, age - (float) Math.floor(age), age);
+    }
+
+    /** Alimentación (inclinado, mandíbula desencajada) y extracción de camas (brazo larguísimo y arrastre). */
+    private void applyScenes(VoidEntity e, float partial, float age) {
+        float ft = e.feedTime(partial);
+        if (ft >= 0.0F) {
+            ScenePose.Feed f = ScenePose.feed(ft);
+            body.xRot += f.down() * 0.55F;
+            head.xRot += f.down() * 0.7F - f.pull() * 0.3F;
+            head.zRot += f.pull() * Mth.sin(age * 2.1F) * 0.25F + f.chew() * 0.1F;
+            jaw.xRot = 0.3F + f.jaw() * 1.0F + Math.max(0.0F, f.chew()) * 0.3F;
+            float dig = f.reach() * 1.0F - f.pull() * 0.8F;
+            armL.xRot = -1.2F - dig;
+            armR.xRot = -1.2F - dig * 0.8F;
+            foreL.xRot = -0.4F + f.pull() * 0.5F + f.chew() * 0.1F;
+            foreR.xRot = -0.4F + f.pull() * 0.4F - f.chew() * 0.1F;
+        }
+        float et = e.extractTime(partial);
+        if (et >= 0.0F) {
+            ScenePose.Extract x = ScenePose.extract(et, com.mimicer.entity.scene.SceneTiming.Kind.VOID);
+            head.xRot += 0.5F * x.search();
+            head.zRot += 0.3F * x.search();
+            jaw.xRot = 0.5F + 0.25F * Mth.sin(age * 0.2F);
+            if (x.grab() < 0.5F) {
+                // Barrido lento y largo bajo la cama.
+                armR.xRot = -1.7F * x.search() - 0.2F;
+                armR.zRot = 0.25F + Mth.sin(et * 0.12F) * 0.55F * x.search();
+                foreR.xRot = -0.1F - 0.4F * Mth.sin(et * 0.2F) * x.search();
+                armL.xRot = -0.4F * x.search();
+            } else {
+                // Cierra la mano y la saca arrastrando en un solo movimiento largo.
+                armR.xRot = -1.7F + 1.3F * x.drag();
+                armR.zRot = 0.25F;
+                foreR.xRot = -0.9F - 0.2F * Mth.sin(age * 0.8F);
+                armL.xRot = -1.0F + 0.5F * x.drag();
+                body.xRot -= 0.35F * x.drag();
+                head.zRot += 0.06F * x.rock();
+                jaw.xRot = 1.0F + 0.2F * Mth.sin(age * 1.2F);
+            }
+        }
     }
 
     @Override

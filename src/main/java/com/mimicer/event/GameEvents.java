@@ -109,6 +109,14 @@ public final class GameEvents {
         UUID playerId = victim instanceof Player ? victim.getUUID() : null;
         CorpseEntity corpse = CorpseEntity.create(level, victim, limbs, playerId);
         level.addFreshEntity(corpse);
+        // El asesino (Mímico o The Void) se acerca al cadáver y se alimenta de él.
+        net.minecraft.world.entity.Entity killer = event.getSource().getEntity();
+        if (!(killer instanceof com.mimicer.entity.scene.SceneHost)) {
+            killer = victim.getLastHurtByMob();
+        }
+        if (killer instanceof com.mimicer.entity.scene.SceneHost host && killer.isAlive()) {
+            host.beginFeeding(corpse);
+        }
         LimbSystem.spawnBlood(level, victim.position().add(0.0, 0.4, 0.0), 60);
         LimbSystem.clear(victim);
     }

@@ -177,6 +177,9 @@ public final class VillagerHandler {
 
     /** Mientras está escondido: quieto bajo la cama hasta que pase el peligro, rompan la cama o lo hieran. */
     private static void tickHiddenVillager(ServerLevel level, Villager villager, CompoundTag data, long now) {
+        if (HideManager.isExtracting(villager.getUUID())) {
+            return;       // un monstruo lo está sacando de la cama: la escena controla su posición
+        }
         BlockPos bed = HideManager.villagerBed(villager);
         boolean bedOk = bed != null && level.getBlockState(bed).getBlock() instanceof BedBlock;
         boolean calm = now - data.getLong(TAG_THREAT) > CALM_TICKS;

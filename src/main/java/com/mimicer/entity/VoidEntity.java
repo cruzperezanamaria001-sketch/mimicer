@@ -48,12 +48,19 @@ import net.minecraftforge.common.Tags;
  * Si te acercas te avisa ("No te acerques", en rojo y con voz); si te acercas más te persigue, te agarra,
  * te levanta y te estampa contra el suelo. Solo ataca a jugadores y aldeanos; los monstruos no le hacen nada.
  */
-public class VoidEntity extends Monster {
+public class VoidEntity extends Monster implements com.mimicer.entity.scene.SceneHost {
     public static final int GRAB_TICKS = 32;
 
     private static final EntityDataAccessor<Boolean> DATA_GRABBING =
             SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.BOOLEAN);
 
+    private static final EntityDataAccessor<Integer> DATA_FEED_START =
+            SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_EXTRACT_START =
+            SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.INT);
+    private com.mimicer.entity.scene.FeedGoal feedGoal;
+    private com.mimicer.entity.scene.BedExtractionGoal extractGoal;
+    private boolean scenePosture;
     private static final EntityDataAccessor<Boolean> DATA_DUCK =
             SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDimensions STAND_DIMS = EntityDimensions.scalable(0.6F, 2.9F);
@@ -144,11 +151,17 @@ public class VoidEntity extends Monster {
         super.defineSynchedData();
         this.entityData.define(DATA_GRABBING, false);
         this.entityData.define(DATA_DUCK, false);
+        this.entityData.define(DATA_FEED_START, -1);
+        this.entityData.define(DATA_EXTRACT_START, -1);
     }
 
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.feedGoal = new com.mimicer.entity.scene.FeedGoal(this);
+        this.extractGoal = new com.mimicer.entity.scene.BedExtractionGoal(this, com.mimicer.entity.scene.SceneTiming.Kind.VOID);
+        this.goalSelector.addGoal(0, this.extractGoal);
+        this.goalSelector.addGoal(0, this.feedGoal);
         this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0D, true));
         this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.OpenDoorGoal(this, false));
         this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 48.0F));
@@ -197,6 +210,15 @@ public class VoidEntity extends Monster {
             tickGrab();
             return;
         }
+        if (isBusyWithScene()) {
+            return;       // comiendo o sacando a alguien de la cama: nada más hasta terminar
+        }
+        if (tickCount % 10 == 0 && getTarget() == null && level() instanceof ServerLevel sl && sceneAllowed()) {
+            HideManager.Hidden h = HideManager.findSeenBy(sl, getUUID(), position(), 40.0);
+            if (h != null) {
+                requestExtraction(h.victim(), h.bed());
+            }
+        }
         if (getTarget() != null) {
             tickChase();
         } else {
@@ -206,6 +228,77 @@ public class VoidEntity extends Monster {
             scanForPrey();
             tickTeleport();
         }
+    }
+
+    // ------------------------------------------------------------------ escenas (comida / extracción)
+
+    @Override
+    public net.minecraft.world.entity.PathfinderMob mob() {
+        return this;
+    }
+
+    @Override
+    public int getFeedStart() {
+        return this.entityData.get(DATA_FEED_START);
+    }
+
+    @Override
+    public void setFeedStart(int t) {
+        this.entityData.set(DATA_FEED_START, t);
+    }
+
+    @Override
+    public int getExtractStart() {
+        return this.entityData.get(DATA_EXTRACT_START);
+    }
+
+    @Override
+    public void setExtractStart(int t) {
+        this.entityData.set(DATA_EXTRACT_START, t);
+    }
+
+    @Override
+    public void scenePosture(boolean crouched) {
+        this.scenePosture = crouched;
+        if (crouched) {
+            setDucking(true);
+        } else if (isDucking() && com.mimicer.util.Ducking.fits(this, STAND_DIMS)) {
+            setDucking(false);
+        }
+    }
+
+    @Override
+    public boolean sceneAllowed() {
+        return grabbed == null && throwPos == null;
+    }
+
+    @Override
+    public void beginFeeding(CorpseEntity corpse) {
+        if (sceneAllowed() && feedGoal != null && !feedGoal.isActive()) {
+            feedGoal.assign(corpse);
+        }
+    }
+
+    @Override
+    public boolean requestExtraction(LivingEntity victim, BlockPos bed) {
+        return bed != null && extractGoal != null && extractGoal.request(victim, bed);
+    }
+
+    @Override
+    public void onExtracted(LivingEntity victim) {
+        if (victim.isAlive()) {
+            startGrab(victim);
+        }
+    }
+
+    @Override
+    public void onExtractFailed(LivingEntity victim) {
+        setTarget(null);
+    }
+
+    @Override
+    public boolean isBusyWithScene() {
+        return (feedGoal != null && feedGoal.isActive()) || (extractGoal != null && extractGoal.isActive());
     }
 
     // ------------------------------------------------------------------ aviso y persecución

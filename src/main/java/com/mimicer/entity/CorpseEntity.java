@@ -47,6 +47,8 @@ public class CorpseEntity extends Entity {
             SynchedEntityData.defineId(CorpseEntity.class, EntityDataSerializers.STRING);
 
     private UUID carrierId;
+    /** Monstruo que se está comiendo este cuerpo (reservado: nadie más lo recoge ni lo come). */
+    private UUID eaterId;
     private boolean thrown;
     private boolean hitSomething;
     private int age;
@@ -114,7 +116,40 @@ public class CorpseEntity extends Entity {
     }
 
     public boolean isFree() {
-        return carrierId == null && !thrown;
+        return carrierId == null && !thrown && eaterId == null;
+    }
+
+    public boolean claimForEating(UUID id) {
+        if (eaterId != null || carrierId != null || thrown) {
+            return false;
+        }
+        eaterId = id;
+        return true;
+    }
+
+    public void releaseEater(UUID id) {
+        if (id.equals(eaterId)) {
+            eaterId = null;
+        }
+    }
+
+    /** Siguiente parte que el monstruo puede comerse (brazos, piernas y por último la cabeza), o 0. */
+    public int nextEdibleLimb() {
+        int missing = getLimbs();
+        int[] order = {com.mimicer.limb.LimbSystem.LEFT_ARM, com.mimicer.limb.LimbSystem.RIGHT_ARM,
+                com.mimicer.limb.LimbSystem.LEFT_LEG, com.mimicer.limb.LimbSystem.RIGHT_LEG,
+                com.mimicer.limb.LimbSystem.HEAD};
+        for (int limb : order) {
+            if ((missing & limb) == 0) {
+                return limb;
+            }
+        }
+        return 0;
+    }
+
+    /** Hace desaparecer visualmente una parte del cuerpo (misma máscara que las mutilaciones). */
+    public void eatLimb(int limb) {
+        this.entityData.set(LIMBS, getLimbs() | limb);
     }
 
     /** El Mímico levanta el cuerpo. */
@@ -151,6 +186,12 @@ public class CorpseEntity extends Entity {
             return;
         }
 
+        if (eaterId != null && age % 20 == 0) {
+            net.minecraft.world.entity.Entity eater = ((ServerLevel) level()).getEntity(eaterId);
+            if (eater == null || !eater.isAlive()) {
+                eaterId = null;
+            }
+        }
         if (age % 40 == 0 && age < 1200 && carrierId == null && onGround()) {
             com.mimicer.blood.BloodSystem.corpseSeep((ServerLevel) level(), this, getLimbs(), age);
         }
