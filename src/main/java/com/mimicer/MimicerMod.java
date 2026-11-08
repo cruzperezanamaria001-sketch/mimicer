@@ -16,6 +16,7 @@ public class MimicerMod {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         ModBlocks.BLOCKS.register(bus);
         ModItems.ITEMS.register(bus);
+        com.mimicer.registry.ModBlockEntities.BLOCK_ENTITIES.register(bus);
         ModEntities.ENTITIES.register(bus);
         com.mimicer.registry.ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
@@ -23,6 +24,10 @@ public class MimicerMod {
                 net.minecraftforge.fml.config.ModConfig.Type.COMMON, com.mimicer.config.GlitchConfig.SPEC);
         net.minecraftforge.fml.ModLoadingContext.get().registerConfig(
                 net.minecraftforge.fml.config.ModConfig.Type.COMMON, com.mimicer.config.BloodConfig.SPEC, "mimicer-blood.toml");
+        net.minecraftforge.fml.ModLoadingContext.get().registerConfig(
+                net.minecraftforge.fml.config.ModConfig.Type.COMMON, com.mimicer.config.ClosetConfig.SPEC, "mimicer-closets.toml");
+        net.minecraftforge.fml.ModLoadingContext.get().registerConfig(
+                net.minecraftforge.fml.config.ModConfig.Type.COMMON, com.mimicer.config.ReaperConfig.SPEC, "mimicer-reaper.toml");
         MinecraftForge.EVENT_BUS.register(this);
     }
 }

@@ -1,0 +1,18 @@
+{
+  "type": "forge:add_spawns",
+  "biomes": [
+    "minecraft:dark_forest",
+    "minecraft:swamp",
+    "minecraft:mangrove_swamp",
+    "minecraft:old_growth_pine_taiga",
+    "minecraft:old_growth_spruce_taiga",
+    "minecraft:taiga",
+    "minecraft:snowy_taiga"
+  ],
+  "spawners": {
+    "type": "mimicer:the_reaper",
+    "weight": 3,
+    "minCount": 1,
+    "maxCount": 1
+  }
+}

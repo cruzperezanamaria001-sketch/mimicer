@@ -45,4 +45,12 @@ public class ModBlocks {
                     .strength(1.0F, 3.0F)
                     .sound(SoundType.AMETHYST)
                     .lightLevel(state -> 6)));
+
+    public static final RegistryObject<Block> WARDROBE = BLOCKS.register("wardrobe",
+            () -> new com.mimicer.block.WardrobeBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.WOOD)
+                    .strength(2.0F, 4.0F)
+                    .sound(SoundType.WOOD)
+                    .noOcclusion()
+                    .pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK)));
 }

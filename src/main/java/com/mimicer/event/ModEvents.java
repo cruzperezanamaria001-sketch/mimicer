@@ -18,6 +18,7 @@ public final class ModEvents {
         event.put(ModEntities.MIMIC.get(), MimicEntity.createAttributes().build());
         event.put(ModEntities.GLITCH.get(), com.mimicer.entity.GlitchEntity.createAttributes().build());
         event.put(ModEntities.VOID.get(), com.mimicer.entity.VoidEntity.createAttributes().build());
+        event.put(ModEntities.REAPER.get(), com.mimicer.entity.ReaperEntity.createAttributes().build());
     }
 
     @SubscribeEvent
@@ -26,6 +27,11 @@ public final class ModEvents {
                 net.minecraft.world.entity.SpawnPlacements.Type.ON_GROUND,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 net.minecraft.world.entity.monster.Monster::checkMonsterSpawnRules,
+                net.minecraftforge.event.entity.SpawnPlacementRegisterEvent.Operation.OR);
+        event.register(ModEntities.REAPER.get(),
+                net.minecraft.world.entity.SpawnPlacements.Type.ON_GROUND,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                com.mimicer.entity.ReaperEntity::checkReaperSpawn,
                 net.minecraftforge.event.entity.SpawnPlacementRegisterEvent.Operation.OR);
         event.register(ModEntities.GLITCH.get(),
                 net.minecraft.world.entity.SpawnPlacements.Type.ON_GROUND,

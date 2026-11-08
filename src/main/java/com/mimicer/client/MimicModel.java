@@ -229,7 +229,9 @@ public class MimicModel extends EntityModel<MimicEntity> {
             body.xRot += f.down() * 0.06F + f.chew() * 0.02F;
         }
         float et = mimic.extractTime(partial);
-        if (et >= 0.0F) {
+        if (et >= 0.0F && mimic.getExtractMode() > 0) {
+            applyCloset(mimic, et, age);
+        } else if (et >= 0.0F) {
             ScenePose.Extract x = ScenePose.extract(et, com.mimicer.entity.scene.SceneTiming.Kind.MIMIC);
             // Asoma la cabeza ladeada para mirar bajo la cama y barre con el brazo derecho, muy estirado.
             head.xRot += 0.55F * x.search() * (1.0F - x.grab());
@@ -289,9 +291,43 @@ public class MimicModel extends EntityModel<MimicEntity> {
         leftLeg.xRot = Mth.lerp(c, leftLeg.xRot, 0.3F + stride * 0.7F);
     }
 
+    /**
+     * Armario del Mímico: pega la oreja a la puerta (cabeza ladeada), la abre tirando con las dos manos, y si hay
+     * alguien mete el brazo largo, agarra y tira a tirones echando el cuerpo atrás; si está vacío asoma y olfatea.
+     */
+    private void applyCloset(MimicEntity mimic, float et, float age) {
+        ScenePose.Closet c = ScenePose.closet(et, com.mimicer.entity.scene.SceneTiming.Kind.MIMIC, mimic.getExtractMode());
+        body.xRot += 0.22F * c.listen() + 0.3F * c.peek() + 0.12F * c.reach() - 0.28F * c.drag();
+        head.zRot = 0.55F * c.listen() * (1.0F - 0.7F * c.open()) + Mth.sin(age * 0.22F) * 0.25F * c.peek()
+                + 0.05F * c.rock();
+        head.xRot += 0.15F * c.listen() + 0.35F * c.peek();
+        float hands = c.open() * (1.0F - c.peek()) * (1.0F - c.reach() * 0.3F);
+        rightArm.xRot -= 0.35F * c.listen() + 1.15F * hands;
+        leftArm.xRot -= 0.35F * c.listen() + 1.15F * hands;
+        rightArm.zRot += 0.7F * c.open() * (1.0F - c.reach());
+        leftArm.zRot -= 0.7F * c.open() * (1.0F - c.reach());
+        if (c.reach() > 0.0F) {
+            // Mete el brazo derecho larguísimo (con la izquierda de apoyo) y agarra.
+            rightArm.yScale = Math.max(rightArm.yScale, 1.0F + 1.1F * c.reach() + 0.4F);
+            rightArm.xRot -= 0.9F * c.reach();
+            leftArm.xRot -= 0.5F * c.reach();
+            rightArm.zRot = 0.1F * (1.0F - c.reach());
+            leftArm.zRot = -0.1F * (1.0F - c.reach());
+        }
+        if (c.grab() > 0.0F) {
+            float ratchet = (float) (c.drag() * 4.0F - Math.floor(c.drag() * 4.0F));
+            rightArm.xRot += 0.9F * ratchet;
+            leftArm.xRot += 0.6F * ratchet;
+            jaw.xRot = 0.65F + 0.3F * Mth.sin(age * 1.4F);
+        } else {
+            jaw.xRot = 0.15F + 0.2F * c.peek() + 0.1F * Mth.sin(age * 0.5F);
+        }
+    }
+
     @Override
     public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay,
                                float red, float green, float blue, float alpha) {
         root.render(poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha);
     }
+
 }

@@ -1,0 +1,77 @@
+{
+ "textures": {
+  "door": "mimicer:block/wardrobe_door",
+  "inner": "mimicer:block/wardrobe",
+  "particle": "mimicer:block/wardrobe"
+ },
+ "elements": [
+  {
+   "from": [
+    0,
+    0,
+    0
+   ],
+   "to": [
+    8,
+    32,
+    1
+   ],
+   "faces": {
+    "north": {
+     "texture": "#door",
+     "uv": [
+      0,
+      0,
+      8,
+      16
+     ]
+    },
+    "south": {
+     "texture": "#inner",
+     "uv": [
+      0,
+      0,
+      8,
+      16
+     ]
+    },
+    "east": {
+     "texture": "#inner",
+     "uv": [
+      0,
+      0,
+      1,
+      16
+     ]
+    },
+    "west": {
+     "texture": "#inner",
+     "uv": [
+      0,
+      0,
+      1,
+      16
+     ]
+    },
+    "up": {
+     "texture": "#inner",
+     "uv": [
+      0,
+      0,
+      8,
+      1
+     ]
+    },
+    "down": {
+     "texture": "#inner",
+     "uv": [
+      0,
+      0,
+      8,
+      1
+     ]
+    }
+   }
+  }
+ ]
+}

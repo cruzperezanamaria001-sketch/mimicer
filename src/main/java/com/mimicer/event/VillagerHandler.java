@@ -181,14 +181,15 @@ public final class VillagerHandler {
             return;       // un monstruo lo está sacando de la cama: la escena controla su posición
         }
         BlockPos bed = HideManager.villagerBed(villager);
-        boolean bedOk = bed != null && level.getBlockState(bed).getBlock() instanceof BedBlock;
+        boolean closet = HideManager.villagerHiddenInCloset(villager);
+        boolean bedOk = bed != null && HideManager.isSpotValid(level, bed, closet);
         boolean calm = now - data.getLong(TAG_THREAT) > CALM_TICKS;
         if (!bedOk || calm || villager.hurtTime > 0) {
             HideManager.unhideVillager(villager);
             return;
         }
         double bx = bed.getX() + 0.5;
-        double by = bed.getY() + 0.02;
+        double by = bed.getY() + (closet ? 0.07 : 0.02);
         double bz = bed.getZ() + 0.5;
         if (villager.distanceToSqr(bx, by, bz) > 0.25) {
             villager.moveTo(bx, by, bz, villager.getYRot(), 0.0F);
@@ -201,6 +202,9 @@ public final class VillagerHandler {
                                     CompoundTag data, BlockPos origin) {
         // Un aldeano dormido ya está a salvo en su cama: no se le toca el cerebro ni cierra puertas.
         if (villager.isSleeping()) {
+            return;
+        }
+        if (seekCloset(level, villager, brain, data)) {
             return;
         }
         BlockPos shelter = findShelter(level, villager, brain, origin);
@@ -231,6 +235,56 @@ public final class VillagerHandler {
                 && (data.getInt(TAG_BOARDS) >= 2 || villager.getRandom().nextFloat() < 0.15F)) {
             HideManager.startHidingVillager(villager, shelter);
         }
+    }
+
+    private static final String TAG_CLOSET = "mimicer_closet";
+    private static final String TAG_CLOSET_ALARM = "mimicer_closet_alarm";
+
+    /** Con una amenaza reciente, algunos aldeanos corren a un armario cercano y se esconden dentro. */
+    private static boolean seekCloset(ServerLevel level, Villager villager, Brain<Villager> brain, CompoundTag data) {
+        if (!com.mimicer.config.ClosetConfig.VILLAGERS_HIDE.get() || !com.mimicer.config.ClosetConfig.ENABLED.get()) {
+            return false;
+        }
+        long now = level.getGameTime();
+        if (now - data.getLong(TAG_THREAT) >= THREAT_RECENT_TICKS) {
+            return false;
+        }
+        long alarm = now / 1200L;
+        BlockPos closet = null;
+        if (data.contains(TAG_CLOSET) && data.getLong(TAG_CLOSET_ALARM) == alarm) {
+            closet = BlockPos.of(data.getLong(TAG_CLOSET));
+        } else if (data.getLong(TAG_CLOSET_ALARM) != alarm) {
+            data.putLong(TAG_CLOSET_ALARM, alarm);
+            data.remove(TAG_CLOSET);
+            if (villager.getRandom().nextFloat() < com.mimicer.config.ClosetConfig.VILLAGER_CLOSET_CHANCE.get()) {
+                for (BlockPos c : com.mimicer.hide.ClosetIndex.near(level, villager.blockPosition(), 10, 3)) {
+                    if (!HideManager.isSpotTaken(level, c) && !com.mimicer.hide.ClosetIndex.isBusy(level, c)) {
+                        closet = c;
+                        data.putLong(TAG_CLOSET, c.asLong());
+                        break;
+                    }
+                }
+            }
+        }
+        if (closet == null || !com.mimicer.block.WardrobeBlock.isWardrobe(level, closet)
+                || HideManager.isSpotTaken(level, closet)) {
+            data.remove(TAG_CLOSET);
+            return false;
+        }
+        net.minecraft.world.phys.Vec3 front = com.mimicer.block.WardrobeBlock.frontPoint(level, closet, 1.4);
+        if (villager.distanceToSqr(front) > 4.0) {
+            brain.setMemory(MemoryModuleType.WALK_TARGET, new WalkTarget(front, 0.95F, 1));
+            return true;
+        }
+        brain.eraseMemory(MemoryModuleType.WALK_TARGET);
+        villager.getNavigation().stop();
+        if (HideManager.startHidingVillagerCloset(villager, closet)) {
+            data.remove(TAG_CLOSET);
+        } else {
+            data.remove(TAG_CLOSET);
+            return false;
+        }
+        return true;
     }
 
     private static BlockPos findShelter(ServerLevel level, Villager villager, Brain<Villager> brain, BlockPos origin) {

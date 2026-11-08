@@ -18,5 +18,8 @@
   "subtitles.mimicer.glitch_beam": "Purple beam",
   "subtitles.mimicer.glitch_step": "The Glitch moves",
   "block.mimicer.blood_stain": "Blood Stain",
-  "block.mimicer.glitched_barricade": "Glitched Barricade"
+  "block.mimicer.glitched_barricade": "Glitched Barricade",
+  "block.mimicer.wardrobe": "Wardrobe",
+  "entity.mimicer.the_reaper": "The Reaper",
+  "item.mimicer.the_reaper_spawn_egg": "The Reaper Spawn Egg"
 }

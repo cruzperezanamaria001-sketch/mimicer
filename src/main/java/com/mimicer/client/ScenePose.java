@@ -64,4 +64,33 @@ public final class ScenePose {
         float rock = t >= kind.grab ? Mth.sin((t - kind.grab) * 0.35F) : 0.0F;
         return new Extract(kneel, t >= kind.grab ? 1.0F : search, grab, drag, rock);
     }
+
+    /**
+     * Armario: listen = escucha pegado a las puertas; open = abre las puertas; peek = mira dentro (vacío);
+     * reach = mete las manos (con víctima); grab = ya la agarra; drag = progreso del arrastre; rock = tirón rítmico.
+     */
+    public record Closet(float listen, float open, float peek, float reach, float grab, float drag, float rock) {}
+
+    public static Closet closet(float t, SceneTiming.Kind k, int mode) {
+        float listen = smooth(t / k.cOpen);
+        float open = smooth((t - k.cOpen) / (float) k.cOpenTicks);
+        float peek = 0.0F;
+        float reach = 0.0F;
+        float grab = 0.0F;
+        float drag = 0.0F;
+        float rock = 0.0F;
+        if (mode == SceneTiming.MODE_CLOSET_EXTRACT) {
+            float from = k.cOpen + k.cOpenTicks;
+            reach = smooth((t - from) / Math.max(1.0F, k.cGrab - from));
+            if (t >= k.cGrab) {
+                grab = 1.0F;
+                drag = Mth.clamp((t - k.cGrab) / (float) (k.cEnd - k.cGrab), 0.0F, 1.0F);
+                rock = Mth.sin((t - k.cGrab) * 0.35F);
+            }
+        } else {
+            peek = smooth((t - (k.cOpen + k.cOpenTicks * 0.5F)) / 10.0F)
+                    * (1.0F - smooth((t - (k.cEmptyEnd - 14)) / 10.0F));
+        }
+        return new Closet(listen, open, peek, reach, grab, drag, rock);
+    }
 }

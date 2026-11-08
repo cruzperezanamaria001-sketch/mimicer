@@ -38,24 +38,27 @@ public final class NetworkHandler {
     public static class HideStatePacket {
         private final boolean hidden;
         private final BlockPos bed;
+        private final boolean closet;
 
-        public HideStatePacket(boolean hidden, BlockPos bed) {
+        public HideStatePacket(boolean hidden, BlockPos bed, boolean closet) {
             this.hidden = hidden;
             this.bed = bed;
+            this.closet = closet;
         }
 
         public static void encode(HideStatePacket msg, FriendlyByteBuf buf) {
             buf.writeBoolean(msg.hidden);
             buf.writeBlockPos(msg.bed);
+            buf.writeBoolean(msg.closet);
         }
 
         public static HideStatePacket decode(FriendlyByteBuf buf) {
-            return new HideStatePacket(buf.readBoolean(), buf.readBlockPos());
+            return new HideStatePacket(buf.readBoolean(), buf.readBlockPos(), buf.readBoolean());
         }
 
         public static void handle(HideStatePacket msg, Supplier<NetworkEvent.Context> ctx) {
             ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                    () -> () -> ClientHooks.setHidden(msg.hidden, msg.bed)));
+                    () -> () -> ClientHooks.setHidden(msg.hidden, msg.bed, msg.closet)));
             ctx.get().setPacketHandled(true);
         }
     }
@@ -72,7 +75,7 @@ public final class NetworkHandler {
             ctx.get().enqueueWork(() -> {
                 ServerPlayer player = ctx.get().getSender();
                 if (player != null) {
-                    HideManager.stopHiding(player);
+                    HideManager.exitHiding(player);
                 }
             });
             ctx.get().setPacketHandled(true);

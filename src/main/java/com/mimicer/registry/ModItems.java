@@ -32,6 +32,13 @@ public class ModItems {
     public static final RegistryObject<Item> GLITCH_BLOCK = ITEMS.register("glitch_block",
             () -> new BlockItem(ModBlocks.GLITCH_BLOCK.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> WARDROBE = ITEMS.register("wardrobe",
+            () -> new BlockItem(ModBlocks.WARDROBE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> REAPER_SPAWN_EGG = ITEMS.register("the_reaper_spawn_egg",
+            () -> new net.minecraftforge.common.ForgeSpawnEggItem(ModEntities.REAPER,
+                    0x0b0b10, 0x8fe3ff, new Item.Properties()));
+
     public static final RegistryObject<Item> GLITCH_SPAWN_EGG = ITEMS.register("the_glitch_spawn_egg",
             () -> new net.minecraftforge.common.ForgeSpawnEggItem(ModEntities.GLITCH,
                     0x120018, 0xb400ff, new Item.Properties()));
@@ -46,6 +53,8 @@ public class ModItems {
                         output.accept(VOID_SPAWN_EGG.get());
                         output.accept(GLITCH_SPAWN_EGG.get());
                         output.accept(GLITCH_BLOCK.get());
+                        output.accept(REAPER_SPAWN_EGG.get());
+                        output.accept(WARDROBE.get());
                     })
                     .build());
 }

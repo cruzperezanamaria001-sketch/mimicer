@@ -18,5 +18,8 @@
   "subtitles.mimicer.glitch_beam": "Rayo morado",
   "subtitles.mimicer.glitch_step": "The Glitch se mueve",
   "block.mimicer.blood_stain": "Mancha de sangre",
-  "block.mimicer.glitched_barricade": "Barricada glitcheada"
+  "block.mimicer.glitched_barricade": "Barricada glitcheada",
+  "block.mimicer.wardrobe": "Armario",
+  "entity.mimicer.the_reaper": "The Reaper",
+  "item.mimicer.the_reaper_spawn_egg": "Huevo generador de The Reaper"
 }

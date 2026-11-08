@@ -64,7 +64,8 @@ public final class BloodSystem {
         if (e instanceof Player p) {
             return !p.isSpectator() && !p.isCreative();
         }
-        if (e instanceof GlitchEntity || e instanceof VoidEntity || e instanceof AbstractGolem
+        if (e instanceof GlitchEntity || e instanceof VoidEntity || e instanceof com.mimicer.entity.ReaperEntity
+                || e instanceof AbstractGolem
                 || e instanceof AbstractSkeleton || e instanceof Slime || e instanceof Blaze) {
             return false;
         }

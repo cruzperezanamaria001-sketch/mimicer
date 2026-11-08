@@ -17,6 +17,18 @@ public final class ClientSetup {
         event.registerEntityRenderer(ModEntities.CORPSE.get(), CorpseRenderer::new);
         event.registerEntityRenderer(ModEntities.VOID.get(), VoidRenderer::new);
         event.registerEntityRenderer(ModEntities.GLITCH.get(), GlitchRenderer::new);
+        event.registerEntityRenderer(ModEntities.REAPER.get(), ReaperRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterBlockEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(com.mimicer.registry.ModBlockEntities.WARDROBE.get(), WardrobeRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional event) {
+        event.register(WardrobeRenderer.DOOR_W);
+        event.register(WardrobeRenderer.DOOR_E);
     }
 
     @SubscribeEvent

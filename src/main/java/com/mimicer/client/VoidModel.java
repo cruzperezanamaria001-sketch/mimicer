@@ -177,7 +177,9 @@ public class VoidModel extends EntityModel<VoidEntity> {
             foreR.xRot = -0.4F + f.pull() * 0.4F - f.chew() * 0.1F;
         }
         float et = e.extractTime(partial);
-        if (et >= 0.0F) {
+        if (et >= 0.0F && e.getExtractMode() > 0) {
+            applyCloset(e, et, age);
+        } else if (et >= 0.0F) {
             ScenePose.Extract x = ScenePose.extract(et, com.mimicer.entity.scene.SceneTiming.Kind.VOID);
             head.xRot += 0.5F * x.search();
             head.zRot += 0.3F * x.search();
@@ -201,9 +203,42 @@ public class VoidModel extends EntityModel<VoidEntity> {
         }
     }
 
+    /**
+     * Armario de The Void: se inclina despacio sobre las puertas, engancha una con un dedo larguísimo y la abre en
+     * un barrido lento; mete las dos manos, cierra los dedos sobre la víctima y la saca de un solo tirón largo.
+     */
+    private void applyCloset(VoidEntity e, float et, float age) {
+        ScenePose.Closet c = ScenePose.closet(et, com.mimicer.entity.scene.SceneTiming.Kind.VOID, e.getExtractMode());
+        body.xRot += 0.25F * c.listen() + 0.35F * c.peek() + 0.15F * c.reach() - 0.4F * c.drag();
+        head.xRot += 0.35F * c.listen() + 0.3F * c.peek();
+        head.zRot += 0.35F * c.listen() + Mth.sin(age * 0.15F) * 0.2F * c.peek();
+        jaw.xRot = 0.35F + 0.5F * c.peek() + 0.4F * c.reach() + (c.grab() > 0.0F ? 0.6F + 0.2F * Mth.sin(age * 1.2F) : 0.0F);
+        float hook = c.open() * (1.0F - c.peek()) * (1.0F - c.reach());
+        armR.xRot = -0.2F - 1.8F * (c.open() * (1.0F - c.peek() * 0.5F));
+        armR.zRot = 0.25F + 0.65F * hook;
+        foreR.xRot = -0.2F - 0.8F * Mth.sin(c.open() * Mth.PI) * (1.0F - c.reach());
+        armL.xRot = -0.2F - 0.9F * c.listen() * (1.0F - c.open());
+        if (c.reach() > 0.0F) {
+            armR.xRot = -1.9F - 0.2F * c.reach();
+            armL.xRot = -1.7F * c.reach();
+            armR.zRot = 0.25F * (1.0F - c.reach());
+            armL.zRot = -0.25F * (1.0F - c.reach());
+            foreR.xRot = -0.3F;
+            foreL.xRot = -0.3F;
+        }
+        if (c.grab() > 0.0F) {
+            armR.xRot = -2.1F + 1.5F * c.drag();
+            armL.xRot = -1.9F + 1.3F * c.drag();
+            foreR.xRot = -0.9F - 0.15F * Mth.sin(age * 0.8F);
+            foreL.xRot = -0.9F - 0.15F * Mth.sin(age * 0.8F + 1.0F);
+            head.zRot += 0.06F * c.rock();
+        }
+    }
+
     @Override
     public void renderToBuffer(PoseStack pose, VertexConsumer vc, int light, int overlay,
                                float r, float g, float b, float a) {
         root.render(pose, vc, light, overlay, r, g, b, a);
     }
+
 }

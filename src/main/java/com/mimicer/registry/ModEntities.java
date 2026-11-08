@@ -31,6 +31,13 @@ public class ModEntities {
                     .clientTrackingRange(10)
                     .build("the_glitch"));
 
+    public static final RegistryObject<EntityType<com.mimicer.entity.ReaperEntity>> REAPER = ENTITIES.register("the_reaper",
+            () -> EntityType.Builder.of(com.mimicer.entity.ReaperEntity::new, MobCategory.MONSTER)
+                    .sized(0.7F, 2.7F)
+                    .fireImmune()
+                    .clientTrackingRange(10)
+                    .build("the_reaper"));
+
     public static final RegistryObject<EntityType<CorpseEntity>> CORPSE = ENTITIES.register("cuerpo",
             () -> EntityType.Builder.of(CorpseEntity::new, MobCategory.MISC)
                     .sized(1.4F, 0.4F)

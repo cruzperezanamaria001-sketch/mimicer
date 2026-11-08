@@ -7,6 +7,7 @@ import com.mimicer.hide.HideManager;
 import com.mimicer.hide.NoiseManager;
 import com.mimicer.limb.LimbSystem;
 import com.mimicer.registry.ModEntities;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -63,8 +64,10 @@ public final class GameEvents {
     /** Los monstruos no le hacen nada a The Void. */
     @SubscribeEvent
     public static void onVoidTarget(LivingChangeTargetEvent event) {
-        if (event.getNewTarget() instanceof com.mimicer.entity.VoidEntity && event.getEntity() instanceof Enemy
-                && !(event.getEntity() instanceof com.mimicer.entity.VoidEntity)) {
+        if ((event.getNewTarget() instanceof com.mimicer.entity.VoidEntity || event.getNewTarget() instanceof com.mimicer.entity.ReaperEntity)
+                && event.getEntity() instanceof Enemy
+                && !(event.getEntity() instanceof com.mimicer.entity.VoidEntity)
+                && !(event.getEntity() instanceof com.mimicer.entity.ReaperEntity)) {
             event.setCanceled(true);
         }
     }
@@ -95,15 +98,16 @@ public final class GameEvents {
         if (!(victim.level() instanceof ServerLevel level) || !LimbSystem.canLoseLimbs(victim)) {
             return;
         }
+        boolean reaper = event.getSource().getEntity() instanceof com.mimicer.entity.ReaperEntity;
         boolean direct = event.getSource().getEntity() instanceof MimicEntity
-                || event.getSource().getEntity() instanceof com.mimicer.entity.VoidEntity;
+                || event.getSource().getEntity() instanceof com.mimicer.entity.VoidEntity || reaper;
         boolean glitch = event.getSource().getEntity() instanceof com.mimicer.entity.GlitchEntity
                 || victim.getLastHurtByMob() instanceof com.mimicer.entity.GlitchEntity;
         if (!direct && !glitch && !(victim.getLastHurtByMob() instanceof MimicEntity)) {
             return;
         }
         int limbs = LimbSystem.get(victim);
-        if (direct && level.random.nextFloat() < 0.25F) {
+        if (direct && level.random.nextFloat() < (reaper ? 0.6F : 0.25F)) {
             limbs |= LimbSystem.HEAD;
         }
         UUID playerId = victim instanceof Player ? victim.getUUID() : null;
@@ -132,6 +136,16 @@ public final class GameEvents {
         if (HideManager.isHidden(player)) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
+        if (state.getBlock() instanceof com.mimicer.block.WardrobeBlock && player.isShiftKeyDown()) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            BlockPos lower = com.mimicer.block.WardrobeBlock.lowerPos(state, event.getPos());
+            if (!level.isClientSide && player instanceof ServerPlayer sp && !sp.isSpectator()
+                    && !HideManager.isSpotTaken(level, lower) && !com.mimicer.hide.ClosetIndex.isBusy(level, lower)) {
+                HideManager.startHidingCloset(sp, lower);
+            }
             return;
         }
         if (state.getBlock() instanceof BedBlock && player.isShiftKeyDown()) {
@@ -176,7 +190,7 @@ public final class GameEvents {
     /** Escondido bajo la cama el jugador es bajito: la cámara queda a ras del suelo. */
     @SubscribeEvent
     public static void onEntitySize(net.minecraftforge.event.entity.EntityEvent.Size event) {
-        if (event.getEntity() instanceof Player player && HideManager.isHidden(player)) {
+        if (event.getEntity() instanceof Player player && HideManager.isHidden(player) && !HideManager.isInCloset(player)) {
             event.setNewSize(net.minecraft.world.entity.EntityDimensions.scalable(0.6F, 0.3F));
             event.setNewEyeHeight(0.15F);
         }

@@ -56,10 +56,14 @@ public class VoidEntity extends Monster implements com.mimicer.entity.scene.Scen
 
     private static final EntityDataAccessor<Integer> DATA_FEED_START =
             SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_EXTRACT_MODE =
+            SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_EXTRACT_START =
             SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.INT);
     private com.mimicer.entity.scene.FeedGoal feedGoal;
     private com.mimicer.entity.scene.BedExtractionGoal extractGoal;
+    private com.mimicer.entity.scene.ClosetGoal closetGoal;
+    private com.mimicer.entity.scene.ClosetBrain closetBrain;
     private boolean scenePosture;
     private static final EntityDataAccessor<Boolean> DATA_DUCK =
             SynchedEntityData.defineId(VoidEntity.class, EntityDataSerializers.BOOLEAN);
@@ -153,6 +157,7 @@ public class VoidEntity extends Monster implements com.mimicer.entity.scene.Scen
         this.entityData.define(DATA_DUCK, false);
         this.entityData.define(DATA_FEED_START, -1);
         this.entityData.define(DATA_EXTRACT_START, -1);
+        this.entityData.define(DATA_EXTRACT_MODE, 0);
     }
 
     @Override
@@ -160,6 +165,9 @@ public class VoidEntity extends Monster implements com.mimicer.entity.scene.Scen
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.feedGoal = new com.mimicer.entity.scene.FeedGoal(this);
         this.extractGoal = new com.mimicer.entity.scene.BedExtractionGoal(this, com.mimicer.entity.scene.SceneTiming.Kind.VOID);
+        this.closetGoal = new com.mimicer.entity.scene.ClosetGoal(this, com.mimicer.entity.scene.SceneTiming.Kind.VOID);
+        this.closetBrain = new com.mimicer.entity.scene.ClosetBrain(this);
+        this.goalSelector.addGoal(0, this.closetGoal);
         this.goalSelector.addGoal(0, this.extractGoal);
         this.goalSelector.addGoal(0, this.feedGoal);
         this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0D, true));
@@ -210,12 +218,13 @@ public class VoidEntity extends Monster implements com.mimicer.entity.scene.Scen
             tickGrab();
             return;
         }
+        tickClosetSearch();
         if (isBusyWithScene()) {
             return;       // comiendo o sacando a alguien de la cama: nada más hasta terminar
         }
         if (tickCount % 10 == 0 && getTarget() == null && level() instanceof ServerLevel sl && sceneAllowed()) {
             HideManager.Hidden h = HideManager.findSeenBy(sl, getUUID(), position(), 40.0);
-            if (h != null) {
+            if (h != null && !h.closet()) {
                 requestExtraction(h.victim(), h.bed());
             }
         }
@@ -273,6 +282,28 @@ public class VoidEntity extends Monster implements com.mimicer.entity.scene.Scen
     }
 
     @Override
+    public int getExtractMode() {
+        return this.entityData.get(DATA_EXTRACT_MODE);
+    }
+
+    @Override
+    public void setExtractMode(int mode) {
+        this.entityData.set(DATA_EXTRACT_MODE, mode);
+    }
+
+    @Override
+    public boolean requestClosetCheck(BlockPos closetLower) {
+        return closetGoal != null && closetGoal.request(closetLower);
+    }
+
+    @Override
+    public void tickClosetSearch() {
+        if (closetBrain != null) {
+            closetBrain.tick();
+        }
+    }
+
+    @Override
     public void beginFeeding(CorpseEntity corpse) {
         if (sceneAllowed() && feedGoal != null && !feedGoal.isActive()) {
             feedGoal.assign(corpse);
@@ -298,7 +329,8 @@ public class VoidEntity extends Monster implements com.mimicer.entity.scene.Scen
 
     @Override
     public boolean isBusyWithScene() {
-        return (feedGoal != null && feedGoal.isActive()) || (extractGoal != null && extractGoal.isActive());
+        return (feedGoal != null && feedGoal.isActive()) || (extractGoal != null && extractGoal.isActive())
+                || (closetGoal != null && closetGoal.isActive());
     }
 
     // ------------------------------------------------------------------ aviso y persecución

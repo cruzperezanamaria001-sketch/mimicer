@@ -32,6 +32,17 @@ public interface SceneHost {
     /** Pide sacar a una víctima escondida; false si ya está ocupado con otra o la víctima ya la lleva otro. */
     boolean requestExtraction(LivingEntity victim, BlockPos bed);
 
+    /** Modo de la escena de extracción en curso (ver {@link SceneTiming#MODE_BED}). */
+    int getExtractMode();
+
+    void setExtractMode(int mode);
+
+    /** Pide revisar un armario (posición inferior); si hay alguien dentro lo sacará. */
+    boolean requestClosetCheck(BlockPos closetLower);
+
+    /** Cerebro de búsqueda de armarios del monstruo (memoria, búsqueda tras perder la presa, revisiones al azar). */
+    default void tickClosetSearch() {}
+
     /** La víctima ya está fuera de la cama: aquí empieza el ataque. */
     void onExtracted(LivingEntity victim);
 
